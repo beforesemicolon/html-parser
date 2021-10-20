@@ -12,7 +12,7 @@ export declare global {
 
 	export interface AttrMock {
 		name: string;
-		value: string;
+		value: string | null;
 
 		toString: () => string;
 	}

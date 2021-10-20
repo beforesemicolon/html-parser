@@ -1,3 +1,5 @@
+import {Attr} from "./core/Attr";
+
 export declare global {
 
 	export enum nodeType {1, 8 , 3}
@@ -34,14 +36,20 @@ export declare global {
 	}
 
 	export interface AttributesMock {
-		[SymbolConstructor.iterator](): IterableIterator<Map<string, AttrMock>>;
+		[SymbolConstructor.iterator]: IterableIterator<Map<string, AttrMock>>;
+		readonly length: number;
+
+		getNamedItem: (name: string) => null | AttrMock;
+		setNamedItem: (name: string, value: string) => void;
+		removeNamedItem: (name: string) => void;
+		toString: () => string;
 	}
 
 	export interface NodeMock {
 		context: {[key: string]: T}
 		selfContext: {[key: string]: T}
 		parentNode: ElementMock | null;
-		readonly nodeName: nodeName | string;
+		readonly nodeName: string | nodeName;
 		readonly nodeType: nodeType;
 		nodeValue: string;
 		firstChild: NodeMock | null;
@@ -79,13 +87,26 @@ export declare global {
 		textContent: string;
 		outerHTML: string;
 		isContentEditable: boolean;
+		tabIndex: string;
+		className: string;
+		readonly contentEditable: boolean;
+		readonly nodeName: string;
+		hidden: boolean;
+		draggable: boolean;
+		spellcheck: boolean;
+		inert: boolean;
+		id: string;
+		title: string;
+		lang: string;
+		slot: string;
+		name: string;
 
 		removeAttribute: (name: string) => void;
 		removeAttributeNode: (attr: AttrMock) => void;
 		hasAttributes: () => boolean;
 		hasAttribute: (name: string) => boolean;
-		getAttribute: (name: string) => string;
-		getAttributeNode: (name: string) => AttrMock;
+		getAttribute: (name: string) => string | null;
+		getAttributeNode: (name: string) => AttrMock | null;
 		setAttribute: (name: string, value: string) => void;
 		setAttributeNode: (attr: AttrMock) => void;
 		appendChild: (node: NodeMock) => void;

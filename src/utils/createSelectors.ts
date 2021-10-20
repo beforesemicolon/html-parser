@@ -6,27 +6,27 @@ import {Selector} from "../core/Selector";
  * @param selectorString
  * @returns Array<Selector>
  */
-export function createSelectors(selectorString: string): Array<Selector> {
+export function createSelectors(selectorString: string): Array<Array<Selector>> {
   selectorString = selectorString.trim();
-  
+
   if (/^(\+|\~|\>)/.test(selectorString)) {
     throw new Error('Invalid selector string: It may not start with any combinator symbol.')
   }
-  
+
   if (/(\+|\~|\>)$/.test(selectorString)) {
     throw new Error('Invalid selector string: It may not end with any combinator symbol.')
   }
-  
+
   const selectors = /(\+|\~|\>|\*)|:([a-z][a-z-]*)(?:\(([^)]*)\))?|\[\s*([a-z][\w:.-]*)\s*(?:\s*(\*|\||\^|\$|\~)?\s*=\s*"([^"]*)")?\s*(i|s)?\s*\]|(?:#|\.)?([a-z][\w-]*)|(?<=[^>+~\s])([ \t]+)(?=[^>+~\s])/gi;
   const pseudoClass = /:(root|not|disabled|enabled|checked|read-only|read-write|required|optional|empty|nth-last-child|nth-child|first-child|last-child|only-child|nth-of-type|nth-last-of-type|first-of-type|last-of-type|only-of-type)/;
   let selectorsList = [];
   let match;
   let lastSelector = null;
   selectors.lastIndex = 0
-  
+
   while ((match = selectors.exec(selectorString)) !== null) {
     let selector = null;
-    
+
     switch (true) {
       case match[0].startsWith('#'):
         selector = Selector.id(match[8]);
@@ -38,29 +38,29 @@ export function createSelectors(selectorString: string): Array<Selector> {
       case match[0].startsWith(':') && pseudoClass.test(match[0]):
         const name = match[2];
         const value = match[3];
-        
+
         if (name === 'not') {
           selector = Selector.pseudoClass(name, createSelectors(value));
         } else {
           selector = Selector.pseudoClass(name, value);
         }
-        
+
         break;
       case match[0].startsWith('[') && match[0].endsWith(']'):
         if (/\s+/.test(match[6])) {
           throw new Error('Invalid selector string: Attribute value must not contain spaces.')
         }
-        
+
         selector = Selector.attribute(match[2] || match[4], match[6]);
-        
+
         if (match[5]) {
           selector.operator = match[5];
         }
-        
+
         if (match[7]) {
           selector.modifier = match[7];
         }
-        
+
         break;
       case match[0] === '*':
         selector = Selector.global();
@@ -78,12 +78,12 @@ export function createSelectors(selectorString: string): Array<Selector> {
           selector = Selector.tag(match[8]);
         }
     }
-    
+
     if (selector) {
       if (lastSelector && lastSelector.type === 'combinator' && lastSelector.type === selector.type) {
         throw new Error('Invalid selector string: Must not contain nested combinator symbols.')
       }
-      
+
       selectorsList.push(selector);
       lastSelector = selector;
     } else {
@@ -93,7 +93,7 @@ export function createSelectors(selectorString: string): Array<Selector> {
       break;
     }
   }
-  
+
   return selectorsList
     .reduce(({selectors, lastSelector}, sel: Selector) => {
       if (!selectors.length) {
@@ -103,7 +103,7 @@ export function createSelectors(selectorString: string): Array<Selector> {
       } else {
         selectors[selectors.length - 1].push(sel)
       }
-      
+
       return {selectors, lastSelector: sel};
     }, {selectors: [], lastSelector: null} as {selectors: any[], lastSelector: Selector | null}).selectors;
 }

@@ -9,32 +9,9 @@ import {traverseNodeAncestors} from "../utils/traverseNodeAncestors";
 import selfClosingTags from '../utils/self-closing-tags.json';
 import reg from '../utils/regexPatterns';
 import {createSelectors} from "../utils/createSelectors";
+import {Selector} from "./Selector";
 
 const {tagCommentPattern} = reg;
-
-const attributePropertyMap: {[key: string]: string} = {
-	className: 'class',
-	contentEditable: 'contenteditable',
-	tabIndex: 'tab-index',
-}
-
-const booleanAttributes: Array<string> = [
-	'hidden',
-	'draggable',
-	'contentEditable',
-	'spellcheck',
-	'inert',
-];
-
-const keyValuePairAttributes: Array<string> = [
-	'className',
-	'id',
-	'tabIndex',
-	'title',
-	'lang',
-	'slot',
-	'name',
-];
 
 export class Element extends Node implements ElementMock {
 	private _tagName: ElementMock['tagName'];
@@ -45,36 +22,122 @@ export class Element extends Node implements ElementMock {
 		super();
 		this._tagName = tagName;
 		this._attributes = new Attributes();
+	}
 
-		// getters and setters for boolean attributes
-		booleanAttributes.forEach(attr => {
-			Object.defineProperty(this, attr, {
-				get() {
-					return this.hasAttribute(attributePropertyMap[attr] || attr);
-				},
-				set(val) {
-					if (val === true) {
-						this.setAttribute(attributePropertyMap[attr] || attr)
-					} else if (val === false) {
-						this.removeAttribute(attributePropertyMap[attr] || attr)
-					}
-				}
-			});
-		})
+	get contentEditable() {
+		return this.hasAttribute('contenteditable');
+	}
 
-		// getters and setters for key-value pair attributes
-		keyValuePairAttributes.forEach(attr => {
-			Object.defineProperty(this, attr, {
-				get() {
-					return this.getAttribute(attributePropertyMap[attr] || attr)
-				},
-				set(val) {
-					if (typeof val === 'string') {
-						this.setAttribute(attributePropertyMap[attr] || attr, val)
-					}
-				}
-			})
-		})
+	set contentEditable(val: boolean) {
+		if (val) {
+			this.setAttribute('contenteditable', 'true')
+		} else {
+			this.setAttribute('contenteditable', 'false')
+		}
+	}
+
+	get spellcheck() {
+		return this.hasAttribute('spellcheck');
+	}
+
+	set spellcheck(val: boolean) {
+		if (val) {
+			this.setAttribute('spellcheck', 'true')
+		} else {
+			this.setAttribute('spellcheck', 'false')
+		}
+	}
+
+	get inert() {
+		return this.hasAttribute('inert');
+	}
+
+	set inert(val: boolean) {
+		if (val) {
+			this.setAttribute('inert', '')
+		} else {
+			this.removeAttribute('inert')
+		}
+	}
+
+	get hidden() {
+		return this.hasAttribute('hidden');
+	}
+
+	set hidden(val: boolean) {
+		if (val) {
+			this.setAttribute('hidden', '')
+		} else {
+			this.removeAttribute('hidden')
+		}
+	}
+
+	get draggable() {
+		return this.hasAttribute('draggable');
+	}
+
+	set draggable(val: boolean) {
+		if (val) {
+			this.setAttribute('draggable', '')
+		} else {
+			this.removeAttribute('draggable')
+		}
+	}
+
+	get id() {
+		return this.getAttribute('id') ?? '';
+	}
+
+	set id(val: string) {
+		this.setAttribute('id', val)
+	}
+
+	get className() {
+		return this.getAttribute('class') ?? '';
+	}
+
+	set className(val: string) {
+		this.setAttribute('class', val)
+	}
+
+	get tabIndex() {
+		return this.getAttribute('tab-index') ?? '';
+	}
+
+	set tabIndex(val: string) {
+		this.setAttribute('tab-index', val)
+	}
+
+	get title() {
+		return this.getAttribute('title') ?? '';
+	}
+
+	set title(val: string) {
+		this.setAttribute('title', val)
+	}
+
+	get lang() {
+		return this.getAttribute('lang') ?? '';
+	}
+
+	set lang(val: string) {
+		this.setAttribute('lang', val)
+	}
+
+	get slot() {
+		return this.getAttribute('slot') ?? '';
+	}
+
+	set slot(val: string) {
+		this.setAttribute('slot', val)
+	}
+
+	get name() {
+		return this.getAttribute('name') ?? '';
+	}
+
+	set name(val: string) {
+		this.setAttribute('name', val)
 	}
 
 	get tagName() {
@@ -116,14 +179,15 @@ export class Element extends Node implements ElementMock {
 	}
 
 	set textContent(value: string) {
-		super.textContent = value.replace(tagCommentPattern, '');
+		value = value.replace(tagCommentPattern, '');
 		this._children = [];
 
 		for (let childNode of this.childNodes) {
 			this.removeChild(childNode);
 		}
 
-		this.appendChild(new Text(super.textContent))
+		// @ts-ignore
+		this.appendChild(new Text(value))
 	}
 
 	get textContent() {
@@ -134,19 +198,19 @@ export class Element extends Node implements ElementMock {
 		return this.toString();
 	}
 
-	get prevElementSibling() {
+	get prevElementSibling(): ElementMock | null {
 		if (this.parentNode) {
 			const sibs = this.parentNode.children
-			return sibs[sibs.indexOf(this) - 1] || null;
+			return sibs[sibs.indexOf(this as unknown as ElementMock) - 1] || null;
 		}
 
 		return null;
 	}
 
-	get nextElementSibling() {
+	get nextElementSibling(): ElementMock | null {
 		if (this.parentNode) {
 			const sibs = this.parentNode.children
-			return sibs[sibs.indexOf(this) + 1] || null;
+			return sibs[sibs.indexOf(this as unknown as ElementMock) + 1] || null;
 		}
 
 		return null;
@@ -169,47 +233,32 @@ export class Element extends Node implements ElementMock {
 		return this.attributes.getNamedItem(name) !== null;
 	}
 
-	setAttribute(name: string, value = null) {
+	setAttribute(name: string, value: string) {
 		if (typeof name === 'string') {
-			if (this._customAttributes && this._customAttributes.hasOwnProperty(name)) {
-				this._customAttributes.set(name, value);
-			}
-
 			this._attributes.setNamedItem(name, value);
 		}
 	}
 
-	setAttributeNode(attr: string) {
+	setAttributeNode(attr: AttrMock) {
 		if (attr instanceof Attr) {
 			this.setAttribute(attr.name, attr.value);
 		}
 	}
 
 	getAttributeNames() {
+		// @ts-ignore
 		return [...this.attributes].map(attr => attr.name);
 	}
 
 	getAttribute(name: string) {
-		if (this._customAttributes && this._customAttributes.has(name)) {
-			return this._customAttributes.get(name);
-		}
-
 		return this.getAttributeNode(name)?.value ?? null;
 	}
 
 	getAttributeNode(name: string) {
-		if (this._customAttributes && this._customAttributes.has(name)) {
-			return new Attr(name, this._customAttributes.get(name));
-		}
-
 		return this.attributes.getNamedItem(name)
 	}
 
 	removeAttribute(name: string) {
-		if (this._customAttributes && this._customAttributes.has(name)) {
-			this._customAttributes.delete(name);
-		}
-
 		this._attributes.removeNamedItem(name);
 	}
 
@@ -224,7 +273,7 @@ export class Element extends Node implements ElementMock {
 			super.appendChild(node);
 
 			if (node instanceof Element) {
-				this._children.push(node);
+				this._children.push(node as unknown as ElementMock);
 			}
 		}
 	}
@@ -234,7 +283,7 @@ export class Element extends Node implements ElementMock {
 			super.removeChild(node);
 
 			if (node instanceof Element) {
-				this._children.splice(this._children.indexOf(node), 1);
+				this._children.splice(this._children.indexOf(node as unknown as ElementMock), 1);
 			}
 		}
 	}
@@ -250,14 +299,15 @@ export class Element extends Node implements ElementMock {
 			super.replaceChild(newNode, oldNode);
 
 			if (newNode instanceof Element) {
-				this._children.splice(this._children.indexOf(oldNode), 1, newNode);
+				this._children.splice(this._children.indexOf(oldNode as unknown as ElementMock), 1, newNode as unknown as ElementMock);
 			}
 		}
 	}
 
-	cloneNode(deep: boolean) {
-		const cloneNode = new Element(this.tagName);
+	cloneNode(deep?: boolean): ElementMock {
+		const cloneNode = new Element(this.tagName) as unknown as ElementMock;
 
+		// @ts-ignore
 		for (let attribute of this.attributes) {
 			cloneNode.setAttribute(attribute.name, attribute.value)
 		}
@@ -274,7 +324,7 @@ export class Element extends Node implements ElementMock {
 		if (deep) {
 			this.childNodes.forEach(child => {
 				child.context = {...this.selfContext};
-				cloneNode.appendChild(child.cloneNode(deep))
+				cloneNode.appendChild((child as ElementMock).cloneNode(deep))
 			});
 		}
 
@@ -302,12 +352,12 @@ export class Element extends Node implements ElementMock {
 			super.insertBefore(newNode, refNode)
 
 			if (newNode instanceof Element) {
-				this._children.splice(this._children.indexOf(refNode), 0, newNode);
+				this._children.splice(this._children.indexOf(refNode as unknown as ElementMock), 0, newNode as unknown as ElementMock);
 			}
 		}
 	}
 
-	insertAdjacentElement(position: string, node: ElementMock) {
+	insertAdjacentElement(position: string, node: NodeMock) {
 		if (node instanceof Element) {
 			this._insert(position, node);
 		}
@@ -328,12 +378,12 @@ export class Element extends Node implements ElementMock {
 
 	querySelector(cssSelectorString: string) {
 		const selectors = this._cssSelectorToSelectorList(cssSelectorString);
-		const lastSelector = selectors[selectors.length - 1];
+		const lastSelector: Array<Selector> = selectors[selectors.length - 1];
 		let matchedNode = null;
 
 		if (lastSelector) {
-			traverseNodeDescendents(this, (descendentNode) => {
-				if (lastSelector.every(selector => matchSelector.single(descendentNode, selector))) {
+			traverseNodeDescendents(this as unknown as ElementMock, (descendentNode: ElementMock) => {
+				if (lastSelector.every((selector: Selector) => matchSelector.single(descendentNode, selector))) {
 					if (selectors.length > 1) {
 						if (matchSelector.list(descendentNode, selectors.length - 2, selectors)) {
 							matchedNode = descendentNode;
@@ -346,6 +396,8 @@ export class Element extends Node implements ElementMock {
 					matchedNode = descendentNode;
 					return true;
 				}
+
+				return false;
 			})
 		}
 
@@ -355,10 +407,10 @@ export class Element extends Node implements ElementMock {
 	querySelectorAll(cssSelectorString: string) {
 		const selectors = this._cssSelectorToSelectorList(cssSelectorString);
 		const lastSelector = selectors[selectors.length - 1];
-		const matchedNodes = [];
+		const matchedNodes: Array<ElementMock> = [];
 
 		if (lastSelector) {
-			traverseNodeDescendents(this, (descendentNode) => {
+			traverseNodeDescendents(this as unknown as ElementMock, (descendentNode: ElementMock) => {
 				if (lastSelector.every(selector => matchSelector.single(descendentNode, selector))) {
 					if (selectors.length > 1) {
 						if (matchSelector.list(descendentNode, selectors.length - 2, selectors)) {
@@ -370,6 +422,8 @@ export class Element extends Node implements ElementMock {
 
 					matchedNodes.push(descendentNode)
 				}
+
+				return false;
 			})
 		}
 
@@ -379,7 +433,7 @@ export class Element extends Node implements ElementMock {
 	matches(cssSelectorString: string) {
 		const selectors = this._cssSelectorToSelectorList(cssSelectorString);
 
-		return matchSelector.list(this, selectors.length - 1, selectors, this);
+		return matchSelector.list(this as unknown as ElementMock, selectors.length - 1, selectors, this as unknown as ElementMock);
 	}
 
 	closest(cssSelectorString: string): ElementMock | null {
@@ -410,7 +464,7 @@ export class Element extends Node implements ElementMock {
 		let tag = `<${this.tagName} ${this._attributes}`.trimRight();
 
 		// @ts-ignore
-		if (selfClosingTags[this.tagName] ) {
+		if (selfClosingTags[this.tagName]) {
 			tag += '>'
 		} else {
 			tag += `>${this.childNodes.join('')}</${this.tagName}>`;
@@ -427,7 +481,7 @@ export class Element extends Node implements ElementMock {
 		}
 	}
 
-	private _insert(position: string, node: ElementMock) {
+	private _insert(position: string, node: NodeMock) {
 		switch (position) {
 			case 'beforebegin':
 				this.before(node);

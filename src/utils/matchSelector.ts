@@ -15,7 +15,7 @@ function matchNodeByNthNotation(node: ElementMock, notation: string, {selectorTy
     let startIndex: number;
     let inc: number;
     let endIndex: number;
-    
+
     if (selectorType.length) {
       children = children
         .filter(child => {
@@ -25,7 +25,7 @@ function matchNodeByNthNotation(node: ElementMock, notation: string, {selectorTy
             });
         })
     }
-    
+
     switch (true) {
       case /^odd$/.test(notation):
         return children.some((n, i) => (i + 1) % 2 !== 0 && n === node);
@@ -76,7 +76,7 @@ function matchNodeByNthNotation(node: ElementMock, notation: string, {selectorTy
         return false;
     }
   }
-  
+
   return false;
 }
 
@@ -232,41 +232,41 @@ function nodeMatchesSelector(node: ElementMock | null, selector: Selector, selec
       }
     }
   }
-  
+
   return false;
 }
 
-function nodeMatchesSelectorList(node: ElementMock, selectorIndex: number, selectorsList: Array<Array<Selector>>, initialNode: ElementMock | undefined): boolean {
+function nodeMatchesSelectorList(node: ElementMock, selectorIndex: number, selectorsList: Array<Array<Selector>>, initialNode?: ElementMock): boolean {
   initialNode = initialNode || node;
   let selectorGroup: Array<Selector> = selectorsList[selectorIndex];
-  
+
   if (selectorGroup.length === 1 && selectorGroup[0].type === 'combinator') {
     const combinator = selectorGroup[0];
-    
+
     switch (combinator.value) {
       case '~':
         let prevSib = node.prevElementSibling;
-        
+
         while (prevSib) {
           if (nodeMatchesSelectorList(prevSib, selectorIndex - 1, selectorsList, initialNode)) {
             return true
           }
-          
+
           prevSib = prevSib.prevElementSibling;
         }
-        
+
         return false;
       case '+':
         if (node.prevElementSibling) {
           return nodeMatchesSelectorList(node.prevElementSibling, selectorIndex - 1, selectorsList, initialNode)
         }
-        
+
         return false;
       case '>':
         if (node.parentNode) {
           return nodeMatchesSelectorList(node.parentNode, selectorIndex - 1, selectorsList, initialNode);
         }
-        
+
         return false;
       default:
         selectorGroup = selectorsList[selectorIndex - 1];
@@ -275,30 +275,30 @@ function nodeMatchesSelectorList(node: ElementMock, selectorIndex: number, selec
           if (parent === initialNode) {
             return true;
           }
-          
+
           if (selectorGroup.every((selector, index) => nodeMatchesSelector(parent, selector, selectorGroup.slice(0, index)))) {
             matchedAncestors.push(parent);
           }
         });
-        
+
         if (!matchedAncestors.length) return false;
-        
+
         if (selectorIndex - 1 === 0) return true;
-        
+
         return matchedAncestors.some(parent => nodeMatchesSelectorList(parent, selectorIndex - 2, selectorsList, initialNode))
     }
   }
-  
+
   const matched: boolean = selectorGroup
     .every((selector, index) => nodeMatchesSelector(node, selector, selectorGroup.slice(0, index)));
-  
+
   // once you match a node we crawl up the selector list for further match
   // the previous selector must be always a combinator so we continue with the same node
   // as that will be handled accordingly
   if (matched && selectorsList[selectorIndex - 1]) {
     return nodeMatchesSelectorList(node, selectorIndex - 1, selectorsList, initialNode)
   }
-  
+
   return matched;
 }
 

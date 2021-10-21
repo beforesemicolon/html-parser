@@ -6,9 +6,9 @@
   "scripts": {
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "build:min": "esbuild src/parser.ts --bundle --minify --sourcemap --target=chrome58 --outfile=dist/parser.min.js",
-    "build:full": "esbuild src/parser.ts --bundle --target=es6 --outfile=dist/parser.js",
-    "build": "tsc --noEmit && rm -rf dist && npm run build:min",
+    "build:parser": "esbuild src/parser.ts --bundle --minify --sourcemap --target=chrome58 --outfile=dist/parser.min.js",
+    "build:project": "tsc -p .",
+    "build": "tsc --noEmit && rm -rf dist && npm run build:project && npm run build:parser",
     "local": "nodemon --watch src -e ts --exec npm run build"
   },
   "keywords": [

@@ -1,4 +1,5 @@
 import {Node} from "./Node";
+import {NodeName} from "../enums/NodeName.enum";
 
 export class Text extends Node implements TextNodeMock {
 	constructor(value: string) {
@@ -8,7 +9,7 @@ export class Text extends Node implements TextNodeMock {
 	}
 
 	get nodeName() {
-		return nodeName.TEXT;
+		return NodeName.TEXT;
 	}
 
 	get nodeType() {

@@ -1,7 +1,8 @@
+import {NodeName} from "../enums/NodeName.enum";
+
 export class Node implements NodeMock {
   private _parentNode: NodeMock['parentNode'] = null;
   private _childNodes: NodeMock['childNodes'] = [];
-  private _context: NodeMock['context'] = {};
   private _textContent: NodeMock['textContent'] = '';
 
   get parentNode() {
@@ -14,8 +15,8 @@ export class Node implements NodeMock {
     }
   }
 
-  get nodeName(): nodeName | string {
-    return nodeName.NODE;
+  get nodeName(): NodeName | string {
+    return NodeName.NODE;
   }
 
   get nodeType() {
@@ -47,20 +48,6 @@ export class Node implements NodeMock {
     this._childNodes = [];
   }
 
-  get context() {
-    return {...this._parentNode?.context, ...this._context};
-  }
-
-  get selfContext() {
-    return this._context;
-  }
-
-  set context(value) {
-    if (value.toString() === '[object Object]') {
-      this._context = value;
-    }
-  }
-
   get prevSibling() {
     if (this.parentNode) {
       const sibs = this.parentNode.childNodes
@@ -83,12 +70,6 @@ export class Node implements NodeMock {
     return this.parentNode
         ? this.parentNode.getRootNode()
         : this as unknown as ElementMock;
-  }
-
-  setContext(name: string, value: unknown) {
-    if (typeof name === 'string') {
-      this._context[name] = value;
-    }
   }
 
   appendChild(node: NodeMock) {

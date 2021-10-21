@@ -17,7 +17,7 @@ export class Attributes implements AttributesMock {
     return this._map.get(name) || null;
   }
   
-  setNamedItem(name: string, value = '') {
+  setNamedItem(name: string, value: string | null = null) {
     this._map.set(name, new Attr(name, value));
   }
   

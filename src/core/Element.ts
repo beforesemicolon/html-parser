@@ -233,9 +233,9 @@ export class Element extends Node implements ElementMock {
 		return this.attributes.getNamedItem(name) !== null;
 	}
 
-	setAttribute(name: string, value: string) {
+	setAttribute(name: string, value: string | null = null) {
 		if (typeof name === 'string') {
-			this._attributes.setNamedItem(name, value);
+			this._attributes.setNamedItem(name, value as string);
 		}
 	}
 
@@ -312,18 +312,8 @@ export class Element extends Node implements ElementMock {
 			cloneNode.setAttribute(attribute.name, attribute.value)
 		}
 
-		// also copy the hidden special attributes as properties
-		// for (let key of Object.keys(attrsPriorities)) {
-		// 	if (this.hasOwnProperty(key)) {
-		// 		cloneNode[key] = this[key]
-		// 	}
-		// }
-
-		cloneNode.context = {...this.selfContext};
-
 		if (deep) {
 			this.childNodes.forEach(child => {
-				child.context = {...this.selfContext};
 				cloneNode.appendChild((child as ElementMock).cloneNode(deep))
 			});
 		}

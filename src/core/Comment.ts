@@ -1,4 +1,5 @@
 import {Node} from "./Node";
+import {NodeName} from "../enums/NodeName.enum";
 
 export class Comment extends Node implements CommentMock {
 	constructor(value: string) {
@@ -8,7 +9,7 @@ export class Comment extends Node implements CommentMock {
 	}
 
 	get nodeName() {
-		return nodeName.COMMENT;
+		return NodeName.COMMENT;
 	}
 
 	get nodeType() {

@@ -1,5 +1,5 @@
-const {Attributes} = require('./Attributes');
-const {Attr} = require('./Attr');
+import {Attributes} from './Attributes';
+import {Attr} from './Attr';
 
 describe('Attributes', () => {
   const attributes = new Attributes();
@@ -36,8 +36,8 @@ describe('Attributes', () => {
   
   it('should get attribute by name', () => {
     expect(attributes.getNamedItem('#if')).toBeInstanceOf(Attr);
-    expect(attributes.getNamedItem('download').value).toEqual(null);
-    expect(attributes.getNamedItem('href').value).toEqual('sample/path');
+    expect(attributes.getNamedItem('download')?.value).toEqual(null);
+    expect(attributes.getNamedItem('href')?.value).toEqual('sample/path');
   });
   
   it('should remove repeated attribute', () => {
@@ -50,7 +50,7 @@ describe('Attributes', () => {
     [...attr].forEach(fn);
   
     expect(attr.length).toBe(1);
-    expect(cls.value).toBe('two');
+    expect(cls?.value).toBe('two');
     expect(fn).toHaveBeenCalledTimes(1);
     expect(attr.toString()).toBe('class="two"');
   

@@ -1,4 +1,4 @@
-const {Attr} = require('./Attr');
+import {Attr} from './Attr';
 
 describe('Attr', () => {
   const attr1 = new Attr('id', 'sample');

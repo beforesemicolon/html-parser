@@ -83,3 +83,9 @@ function setAttributes(node: ElementMock, attributes: string) {
 		}
 	}
 }
+
+// @ts-ignore
+if (window) {
+	// @ts-ignore
+	window.Parser = Parser
+}

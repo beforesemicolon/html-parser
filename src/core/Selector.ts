@@ -1,10 +1,12 @@
-export class Selector {
+import {SelectorType} from "../enums/SelectorType.enum";
+
+export class Selector implements SelectorMock {
   constructor(
-      public type: selectorType,
-      public name: string | null = null,
-      public value: string | Selector | Array<Array<Selector>> | null = null,
-      public operator: string | null = null,
-      public modifier: string | null = null,
+      public type: SelectorType,
+      public name: SelectorMock['name'] = null,
+      public value: SelectorMock['value'] = null,
+      public operator: SelectorMock['operator'] = null,
+      public modifier: SelectorMock['modifier'] = null,
   ) {
     if (!/tag|global|attribute|pseudo-class|combinator/.test(type)) {
         throw new Error('Invalid or missing selector type.')
@@ -12,31 +14,31 @@ export class Selector {
   }
 
   static global() {
-    return new Selector(selectorType.GLOBAL, null, '*')
+    return new Selector(SelectorType.GLOBAL, null, '*')
   }
 
   static tag(name: string) {
-    return new Selector(selectorType.TAG, name)
+    return new Selector(SelectorType.TAG, name)
   }
 
   static class(value: string) {
-    return new Selector(selectorType.ATTRIBUTE, 'class', value, '~')
+    return new Selector(SelectorType.ATTRIBUTE, 'class', value, '~')
   }
 
   static id(value: string) {
-    return new Selector(selectorType.ATTRIBUTE, 'id', value)
+    return new Selector(SelectorType.ATTRIBUTE, 'id', value)
   }
 
-  static attribute(name: string, value: string, operator: string | null = null, modifier: string | null = null) {
-    return new Selector(selectorType.ATTRIBUTE, name, value, operator, modifier)
+  static attribute(name: string, value: SelectorMock['value'], operator: SelectorMock['operator'] = null, modifier: string | null = null) {
+    return new Selector(SelectorType.ATTRIBUTE, name, value, operator, modifier)
   }
 
-  static pseudoClass(name: string, value: string | Selector | Array<Array<Selector>>) {
-    return new Selector(selectorType.PSEUDO_CLASS, name, value)
+  static pseudoClass(name: string, value: SelectorMock['value'] = null) {
+    return new Selector(SelectorType.PSEUDO_CLASS, name, value)
   }
 
   static combinator(value: string) {
-    return new Selector(selectorType.COMBINATOR, null, value)
+    return new Selector(SelectorType.COMBINATOR, null, value)
   }
 
   toString() {

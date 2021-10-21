@@ -1,14 +1,8 @@
-import {Attr} from "./core/Attr";
+import {NodeName} from './enums/NodeName.enum';
+import {NodeType} from './enums/NodeType.enum';
+import {SelectorType} from './enums/SelectorType.enum';
 
 export declare global {
-
-	export enum nodeType {1, 8 , 3}
-
-	export enum nodeName {
-		TEXT = '#text',
-		COMMENT = '#comment',
-		NODE = '#node'
-	}
 
 	export interface AttrMock {
 		name: string;
@@ -17,18 +11,10 @@ export declare global {
 		toString: () => string;
 	}
 
-	export enum selectorType {
-		TAG = 'tag',
-		GLOBAL = 'global',
-		ATTRIBUTE = 'attribute',
-		PSEUDO_CLASS = 'pseudo-class',
-		COMBINATOR = 'combinator',
-	}
-
-	export interface Selector {
-		type: selectorType;
+	export interface SelectorMock {
+		type: SelectorType;
 		name: string | null;
-		value: string | Selector | Array<Selector> | null;
+		value: string | Selector | Array<Array<SelectorMock>> | null;
 		operator: string | null;
 		modifier: string | null;
 
@@ -46,11 +32,9 @@ export declare global {
 	}
 
 	export interface NodeMock {
-		context: {[key: string]: T}
-		selfContext: {[key: string]: T}
 		parentNode: ElementMock | null;
-		readonly nodeName: string | nodeName;
-		readonly nodeType: nodeType;
+		readonly nodeName: string | NodeName;
+		readonly nodeType: NodeType;
 		nodeValue: string;
 		firstChild: NodeMock | null;
 		lastChild: NodeMock | null;
@@ -60,7 +44,6 @@ export declare global {
 		textContent: string;
 
 		getRootNode: () => ElementMock | null;
-		setContext: (name: string, value: T) => void;
 		appendChild: (node: NodeMock) => void;
 		removeChild: (node: NodeMock) => void;
 		replaceChild: (node: NodeMock, node: NodeMock) => void;

@@ -1,18 +1,20 @@
 import selfClosingTags from "./utils/self-closing-tags.json";
 
-export function Parser(document: DocumentMock) {
+export function Parser(document: Document | null = null) {
 	// @ts-ignore
 	document = document ?? window.document;
 
 	return function parse(markup: string) {
-		const tagCommentPattern = /<!--([^]*?)-->|<(\/|!)?([a-z][\w-.:]*)((?:\s+#?[a-z][\w-.:]*(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)+\s*|\s*)(\/?)>/ig;
-		const root = document.createDocumentFragment();
-		const stack: Array<ElementMock> = [root];
+		const tagCommentPattern = /<!--([^]*?)-->|<(\/|!)?([a-z][\w-.:]*)((?:\s+[a-z][\w-.:]*(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)+\s*|\s*)(\/?)>/ig;
+		const root = (document as Document).createDocumentFragment();
+		const stack: Array<DocumentFragment | HTMLElement> = [root];
 		let match: RegExpExecArray | null = null;
 		let lastIndex = 0;
 
 		while ((match = tagCommentPattern.exec(markup)) !== null) {
-			const [fullMatch, comment, closeOrBangSymbol, tagName, attributes, selfCloseSlash] = match;
+			let [fullMatch, comment, closeOrBangSymbol, tagName, attributes, selfCloseSlash] = match;
+
+			tagName = tagName?.toUpperCase();
 
 			if (closeOrBangSymbol === '!') {
 				continue;
@@ -22,20 +24,20 @@ export function Parser(document: DocumentMock) {
 
 			// grab in between text
 			if (lastIndex !== match.index) {
-				const textNode = document.createTextNode(markup.slice(lastIndex, match.index));
+				const textNode = (document as Document).createTextNode(markup.slice(lastIndex, match.index));
 				parentNode.appendChild(textNode);
 			}
 
 			lastIndex = tagCommentPattern.lastIndex;
 
 			if (comment) {
-				const commentNode = document.createComment(comment);
+				const commentNode = (document as Document).createComment(comment);
 				parentNode.appendChild(commentNode);
 				continue;
 			}
 
 			if (selfCloseSlash || (selfClosingTags as {[key: string]: string})[tagName]) {
-				const node = document.createElement(tagName);
+				const node = (document as Document).createElement(tagName);
 
 				setAttributes(node, attributes)
 
@@ -43,7 +45,7 @@ export function Parser(document: DocumentMock) {
 			} else if (closeOrBangSymbol === '/') {
 				stack.pop();
 			} else if (!closeOrBangSymbol) {
-				const node = document.createElement(tagName);
+				const node = (document as Document).createElement(tagName);
 
 				setAttributes(node, attributes)
 
@@ -55,7 +57,7 @@ export function Parser(document: DocumentMock) {
 
 		// grab ending text
 		if (lastIndex < markup.length) {
-			const textNode = document.createTextNode(markup.slice(lastIndex));
+			const textNode = (document as Document).createTextNode(markup.slice(lastIndex));
 			root.appendChild(textNode);
 		}
 
@@ -63,24 +65,17 @@ export function Parser(document: DocumentMock) {
 	}
 }
 
-function setAttributes(node: ElementMock, attributes: string) {
-	const attrPattern = /(#?[a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/ig;
+function setAttributes(node: HTMLElement, attributes: string) {
+	const attrPattern = /([a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/ig;
 	let match: RegExpExecArray | null = null;
 
 	while ((match = attrPattern.exec(attributes))) {
-		const name = match[1];
+		let name = match[1];
 		const value = match[2] || match[3] || match[4] || (
 			new RegExp(`^${match[1]}\\s*=`).test(match[0]) ? '' : null
 		)
 
-		if (name.startsWith('#')) {
-			// this is a special handler for custom attributes since its syntax is not allowed
-			// for HTML attributes allowing this parser to work with normal DOM elements
-			// @ts-ignore
-			node[name] = value;
-		} else {
-			node.setAttribute(name, value ?? '');
-		}
+		node.setAttribute(name, value ?? '');
 	}
 }
 

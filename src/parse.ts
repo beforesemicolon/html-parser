@@ -1,31 +1,31 @@
 import selfClosingTags from './self-closing-tags.json';
 
-export interface NodeLike extends Node {
+export interface ElementLike extends Element {
 	setAttribute: (name: string, val: string) => void;
-	lastElementChild: NodeLike;
+	lastElementChild: ElementLike;
 	nodeName: string;
 	textContent: string;
 	appendChild: <P>(node: P) => P;
 }
 
-export interface NodeHandlerDocument<F extends DocumentFragment, N> {
+export interface NodeHandlerDocument<F extends DocumentFragment> {
 	createDocumentFragment: () => F;
-	createTextNode: (text?: string) => N;
-	createComment: (comment?: string) => N;
-	createElement: (tagName: string) => N;
-	createElementNS: (ns: string, tagName: string) => N;
+	createTextNode: (text?: string) => ElementLike;
+	createComment: (comment?: string) => ElementLike;
+	createElementNS: (ns: string, tagName: string) => ElementLike;
 }
 
-export type NodeHandlerCallback<T> = (node: T) => void;
+export type NodeHandlerCallback = (node: ElementLike) => void;
 
-export type NodeHandler<F extends DocumentFragment, N> = NodeHandlerCallback<N> | NodeHandlerDocument<F, N>
+export type NodeHandler<F extends DocumentFragment> = NodeHandlerCallback | NodeHandlerDocument<F>
 
+// URI based on https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS
 const NSURI: Record<string, string> = {
 	HTML: 'http://www.w3.org/1999/xhtml',
 	SVG: 'http://www.w3.org/2000/svg',
 }
 
-function setAttributes(node: NodeLike, attributes: string) {
+const setAttributes = (node: ElementLike, attributes: string) => {
 	attributes = attributes?.trim();
 	if (attributes) {
 		const attrPattern = /([a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/ig;
@@ -44,100 +44,146 @@ function setAttributes(node: NodeLike, attributes: string) {
 
 const isStyleOrScriptTag = (tagName: string) => /SCRIPT|STYLE/i.test(String(tagName));
 
-const isHtmlOrSvgTag = (tagName: string) => /SVG|HTML/i.test(String(tagName));
+interface TempNode<F> {
+	tagName: string;
+	node: ElementLike | F;
+	ns: string;
+}
 
-export const parse = <T extends DocumentFragment, N extends NodeLike>(markup: string, handler?: NodeHandler<T, N>): T => {
-	// const pattern = /<!--(.*?(?=-->))-->|<(\/|!)?([a-z][\w\-.:]*)(\s*[^>]*?)(\/)?>(?:(.*?)<\/\3>)?/gis;
-	const pattern = /<!--(.*?(?=-->))-->|<(\/|!)?([a-zA-Z][\w\-.:]*)(\s*[^>]*?)(\/)?>(?:(.*?)(?<=<\/\s*\3\s*>)<\/\s*\3\s*>)?/gis;
+// export const parse = <T extends DocumentFragment, N extends ElementLike>(markup: string, handler?: NodeHandler<T, N>): T => {
+export const parse = <T extends DocumentFragment>(markup: string, handler: NodeHandler<T> | null = null): T => {
+	const pattern = /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi;
 	let match: RegExpExecArray | null = null;
-	let isNSTag = false
-	let URI = '';
+	const doc = (!handler || typeof handler === "function" ? document : handler) as NodeHandlerDocument<T>;
+	const cb = typeof handler === "function" ? handler : null;
+	const stack: Array<TempNode<T>> = [
+		{tagName: "frag", node: doc.createDocumentFragment(), ns: NSURI.HTML}
+	];
 	let lastIndex = 0;
-	const doc = (!handler || typeof handler === "function" ? document : handler) as NodeHandlerDocument<T, N>;
-	const cb = (typeof handler === "function" ? handler : () => {}) as NodeHandlerCallback<N>
-	const frag = doc.createDocumentFragment();
-	let openedScriptOrStyleLastMatchIndex = 0;
 	
 	while ((match = pattern.exec(markup)) !== null) {
-		let [fullMatchedString, comment, closeOrBangSymbol, tagName, attributes, selfCloseSlash, content] = match;
+		const [_, comment, bangOrClosingSlash, tagName, attributes, selfClosingSlash] = match;
 		
-		console.log({markup, tagName, fullMatchedString, content, comment, closeOrBangSymbol});
+		// console.log({comment, tagName, selfClosingSlash, bangOrClosingSlash, lastEntry: stack.at(-1)?.tagName});
 		
-		if (closeOrBangSymbol) {
+		if (bangOrClosingSlash === '!') {
+			lastIndex = pattern.lastIndex;
 			continue;
 		}
 		
-		if (openedScriptOrStyleLastMatchIndex && isStyleOrScriptTag(tagName)) {
-			continue;
+		const stackLastItem = stack.at(-1) as TempNode<T>;
+
+		// pre lingering text
+		if (match.index >= lastIndex + 1) {
+			const text = markup.slice(lastIndex, match.index);
+			const node = doc.createTextNode(text);
+			// console.log('-- pre text', {text});
+			(stackLastItem.node as ElementLike).appendChild(node);
+			cb !== null && cb(node)
 		}
-		
-		// grab in between text
-		if (match.index > 0) {
-			const textNode = doc.createTextNode(markup.slice(0, match.index));
-			frag.appendChild(textNode);
-			cb(textNode);
-		}
-		
+
+		lastIndex = pattern.lastIndex;
+
 		if (comment) {
-			const commentNode = doc.createComment(comment);
-			frag.appendChild(commentNode);
-			cb(commentNode);
-		} else if (tagName) {
-			if (isHtmlOrSvgTag(tagName)) {
-				isNSTag = true;
-				URI = NSURI[tagName];
+			// console.log('-- comment', comment);
+			const node = doc.createComment(comment);
+			(stackLastItem.node as ElementLike).appendChild(node);
+			cb !== null && cb(node)
+			continue;
+		}
+		
+		if (tagName) {
+			const selfClosingTag = Boolean(tagName) && (selfClosingTags as Record<string, string>)[tagName.toUpperCase()] || selfClosingSlash === '/';
+			
+			if (bangOrClosingSlash) {
+				if (new RegExp(tagName, 'i').test(stackLastItem.tagName)) {
+					stack.pop();
+					// console.log('-- closing', tagName, stack);
+				}
+				continue;
 			}
 			
-			if (selfCloseSlash || (selfClosingTags as { [key: string]: string })[tagName.toUpperCase()]) {
-				const node = isNSTag
-					? doc.createElementNS(URI, tagName.toLowerCase())
-					: doc.createElement(tagName.toLowerCase());
+			const ns = /svg/i.test(tagName)
+				? NSURI.SVG
+				: /html/i.test(tagName)
+					? NSURI.HTML
+					: stackLastItem.ns;
+			
+			if (selfClosingTag) {
+				const node = doc.createElementNS(ns, tagName.toLowerCase());
 				
-				setAttributes(node, attributes)
-				frag.appendChild(node);
-				cb(node);
-			} else if (!closeOrBangSymbol) {
-				const node = isNSTag
-					? doc.createElementNS(URI, tagName.toLowerCase())
-					: doc.createElement(tagName.toLowerCase());
+				setAttributes(node, attributes);
 				
-				setAttributes(node, attributes)
-				frag.appendChild(node);
-				cb(node);
+				(stackLastItem.node as ElementLike).appendChild(node);
+				cb !== null && cb(node)
+				// console.log('-- self closing', tagName, stack.at(-1)?.node.childNodes.length);
+				continue;
+			}
+			
+			const node = doc.createElementNS(ns, tagName) as ElementLike;
+			setAttributes(node, attributes);
+			
+			// console.log('-- opening', tagName);
+			
+			// scripts in particular can have html strings which does not impact
+			// the overall markup therefore we need a special lookup to find the closing tag
+			// without considering these possible HTML tag matches to be part of the final DOM
+			if (isStyleOrScriptTag(tagName)) {
+				// try to find the closing tag
+				const possibleSimilarOnesNested: string[] = [];
+				const exactTagPattern = new RegExp(`<(\\/)?(${tagName})\\s*([^>]*?)>`, 'ig');
+				const markupAhead = markup.slice(lastIndex);
+				let tagMatch: RegExpExecArray | null = null;
 				
-				if (content?.length) {
-					// full length of the opening tag including attributes and 2 for opening and close <|>
-					// const tagOpenOrCloseSize = 1;
-					// const endOfTagIndex =  tagOpenOrCloseSize + tagName.length + attributes?.length + tagOpenOrCloseSize;
-					// const endTagPattern = new RegExp(`(<\/\s*${tagName}\s*>)[^<>]*$`, 'si');
-					// const endMatch = fullMatchedString.match(endTagPattern);
-					// const endOfContentIndex = endMatch?.index || fullMatchedString.length;
-					// const tagContent = fullMatchedString.slice(endOfTagIndex, endOfContentIndex);
-					//
-					// console.log('-- content after', {tagName, content, tagContent, endMatch, endOfTagIndex, markup, fullMatchedString});
+				while ((tagMatch = exactTagPattern.exec(markupAhead)) !== null) {
+					const [_, closingSlash, name, attributes, selfClosingSlash] = tagMatch;
 					
-					if (isStyleOrScriptTag(tagName)) {
-						node.textContent = content
-					} else {
-						node.appendChild(parse(content, handler));
+					// check if the tag name is matched
+					if (new RegExp(tagName, 'i').test(name)) {
+						if (closingSlash) {
+							if (!possibleSimilarOnesNested.length) {
+								node.textContent = markupAhead.slice(0, tagMatch.index);
+								(stackLastItem.node as ElementLike).appendChild(node);
+								// console.log('-- closing', tagName);
+								lastIndex = lastIndex + exactTagPattern.lastIndex;
+								pattern.lastIndex = lastIndex; // move the pattern needle to start matching later in the string
+								break;
+							} else {
+								possibleSimilarOnesNested.pop()
+							}
+						} else if(!selfClosingSlash) {
+							// could be that there is a script HTML string inside
+							// we need to track those so we don't mix them with the possible script closing tag
+							possibleSimilarOnesNested.push(name);
+						}
 					}
 				}
+			} else {
+				stack.push({
+					tagName,
+					node,
+					ns
+				});
 			}
+			
+			(stackLastItem.node as ElementLike).appendChild(node);
+			
+			cb !== null && cb(node)
+			
 		}
-		
-		markup = markup.slice(match.index + fullMatchedString.length)
-		
-		console.log('-- sliced');
+	}
+
+	if (stack.length > 1) {
+		console.warn(`${stack.length - 1} tag(s) detected as not being closed properly. This may result in undesirable HTML rendering. Tag(s): [${stack.slice(1).map(n => n.tagName)}]`)
+	}
+
+	if (lastIndex < markup.length) {
+		const text = markup.slice(lastIndex);
+		const node = doc.createTextNode(text);
+		// console.log('-- post text', {text});
+		(stack[0].node as ElementLike).appendChild(node);
+		cb !== null && cb(node)
 	}
 	
-	console.log('-- end', markup);
-	
-	// grab ending text
-	if (markup.length) {
-		const textNode = doc.createTextNode(markup);
-		frag.appendChild(textNode);
-		cb(textNode);
-	}
-	
-	return frag;
+	return stack[0].node as T;
 }

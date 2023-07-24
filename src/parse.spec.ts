@@ -20,51 +20,63 @@ function stringifyNode(node: any): string {
   return '';
 }
 
-// <head>
-//   <meta charset="UTF-8">
-// <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-// <meta http-equiv="X-UA-Compatible" content="ie=edge">
-//   <title>Document</title>
-//   <link rel="stylesheet" href="style.css">
-//   </head>
-//   <body>
-//   <!-- logo -->
-//   <h1>Page</h1>
-//
-//   <script src="app.js" type="module"></script>
-//   </body>
-
 describe('parse', () => {
   const basicPageMarkup = `
-    <!doctype html>
-    <html lang="en">
-      <head>
-      
-      </head>
-      <body>
-      
-      </body>
-    </html>
-    `;
-
-  it('should parse content and keep all white space intact', () => {
-    const root = parse(basicPageMarkup);
-
-    // expect(stringifyNode(root)).toEqual(``);
-    console.log('-- done:', stringifyNode(root));
-  });
+<!doctype>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    some lose text at the top
+    <!-- logo -->
+    <h1>Page</h1>
+    <script src="app.js" type="module">
+      const x = '<script>console.log(12)</script>';
+    </script>
+    some lose text at the end
+  </body>
+</html>`;
+  const x = `
+<script type="text/javascript" src="http://rt.legolas-media.com/lgrt?ci=2&ti=11263&pbi=10888"></script><script type="text/javascript">
+                                //Generic method to read cookie
+                                function readCookie(name){
+                                    var nameEQ=name+"=";
+                                    var ca=document.cookie.split(';');
+                                    for(var i=0; i<ca.length;i++){
+                                      var c=ca[i];
+                                      while(c.charAt(0)==' ') c=c.substring(1,c.length);
+                                      if(c.indexOf(nameEQ)==0) return c.substring(nameEQ.length,c.length);
+                                }
+                                    return null;
+                                };
+                                //Turn lsg cookie into an array to be use with sectionKeywords param
+                                function lgAptGetSectionKeywords(){
+                                    //Read lsg cookie
+                                    var lsg=readCookie('lsg');
+                                    var lgApt=new Array();
+                                    if(lsg){
+                                      //Tokenize
+                                      var cookieTokens=lsg.split('s');
+                                
+                                      //Fill APT keywords array
+                                      for(var i=0;i <cookieTokens.length; i++){
+                                        if(cookieTokens[i]!='0') lgApt.push(cookieTokens[i]);
+                                      }
+                                    }
+                                    return lgApt;
+                                };
+                                </script>`
   
-  it('should ', () => {
-    const pattern = /\d/;
-    let match = null;
-    let markup = 'ksadhjq3ujkshd3hjhjq2ds33d222n3---'
-    
-    while((match = pattern.exec(markup)) !== null) {
-      console.log(markup);
-      markup = markup.slice(match.index + match[0].length)
-    }
-    
-    console.log('-- markup', markup);
+  it('should parse content and keep all white space intact', () => {
+    const root = parse(x);
+
+    // expect(stringifyNode(root)).toEqual(x);
+    console.log('-- done:', stringifyNode(root));
   });
   
   describe('should handle self-closing tag', () => {
@@ -118,6 +130,12 @@ describe('parse', () => {
         '<bfs-img src="img/circle" alt=""></bfs-img>');
     });
   });
+  
+  describe('should throw if strict is on', () => {
+    it('if forgot to close tag', () => {});
+    
+    it('if unbalanced HTML', () => {});
+  })
 
   describe('should handle open-closing tag', () => {
     it('when no inner content', () => {
@@ -179,22 +197,20 @@ describe('parse', () => {
 
     it('with similar open-closing tag inside', () => {
       const root = parse('<div><div>Some title</div></div>');
-      
-      // expect(root.children.length).toBe(1);
-      // expect(root.children[0].tagName).toBe('DIV');
-      // expect(root.children[0].children.length).toBe(1);
-      // expect(root.children[0].childNodes.length).toBe(1);
-      // expect(stringifyNode(root.children[0])).toBe('<div><div>Some title</div></div>');
-      // expect(root.children[0].textContent).toBe('Some title');
-      // expect(stringifyNode(root)).toBe('<div><div>Some title</div></div>');
-      console.log(stringifyNode(root));
-    });
 
-    it('when no closing slash is present', () => {
-      const root = parse('<div><div>Some title<div><div>');
-
-      expect(stringifyNode(root)).toBe('<div></div><div></div>Some title<div></div><div></div>');
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].tagName).toBe('DIV');
+      expect(root.children[0].children.length).toBe(1);
+      expect(root.children[0].childNodes.length).toBe(1);
+      expect(stringifyNode(root.children[0])).toBe('<div><div>Some title</div></div>');
+      expect(root.children[0].textContent).toBe('Some title');
+      expect(stringifyNode(root)).toBe('<div><div>Some title</div></div>');
     });
+    
+    // it('when no closing slash is present', () => {
+    //   const root = parse('<div><div>Some title<div><div>');
+    //   expect(stringifyNode(root)).toBe('<div></div><div></div>Some title<div></div><div></div>');
+    // })
 
   });
 
@@ -230,59 +246,59 @@ describe('parse', () => {
       expect(root.textContent).toBe('some text');
     });
   });
-  
+
   describe("should handle script tags", () => {
     it('when empty', () => {
       const root = parse('<script></script>');
-      
+
       expect(root.children.length).toBe(1);
       expect(stringifyNode(root)).toBe('<script></script>');
     });
-    
+
     it('when with content', () => {
       const htmlStr = `<script>console.log('works')</script>`
       const root = parse(htmlStr);
-      
+
       expect(root.children.length).toBe(1);
       expect(stringifyNode(root)).toBe('<script>console.log(\'works\')</script>');
     });
-    
+
     it('when with content and attributes', () => {
       const htmlStr = `<script type="module">console.log('works')</script>`
       const root = parse(htmlStr);
-      
+
       expect(root.children.length).toBe(1);
       expect(stringifyNode(root)).toBe('<script type="module">console.log(\'works\')</script>');
     });
-    
+
     it('when with html string in content', () => {
       const htmlStr = `<script type="module">const scriptStr = '<script>console.log("works")</script>';</script>`
       const root = parse(htmlStr);
-      
+
       expect(root.children.length).toBe(1);
       expect(root.children[0].children.length).toBe(0);
       expect(stringifyNode(root)).toBe(`<script type="module">const scriptStr = '<script>console.log("works")</script>';</script>`);
     });
-    
+
     it('when self-closed', () => {
       const root = parse('<script/>');
-      
+
       expect(root.children.length).toBe(1);
       expect(root.children[0].children.length).toBe(0);
       expect(stringifyNode(root)).toBe('<script></script>');
     });
-    
+
     it('when self-closed with attributes', () => {
       const root = parse('<script src="app.js" type="module"/>');
-      
+
       expect(root.children.length).toBe(1);
       expect(root.children[0].children.length).toBe(0);
       expect(stringifyNode(root)).toBe('<script src="app.js" type="module"></script>');
     });
   })
-  
+
   describe('should handle SVG tags', () => {})
-  
+
   describe('should handle style tags', () => {})
 
 })

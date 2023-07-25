@@ -5,6 +5,7 @@ global.document = new JSDOM('').window.document;
 const fs = require('fs');
 const Benchmark = require('htmlparser-benchmark');
 const {parse} = require('./dist/parse');
+const {Doc} = require('./dist/Doc');
 
 const filesDir = '/Users/ecorreia/Sites/@beforesemicolon/html-parser/node_modules/htmlparser-benchmark/files';
 
@@ -17,51 +18,8 @@ const filesDir = '/Users/ecorreia/Sites/@beforesemicolon/html-parser/node_module
 //   })
 // })
 
-const node = (nodeName, textContent) => {
-  const nodes = [];
-  const children = [];
-  const attributes = {};
-  let value = '';
-  
-  return {
-    type: "element",
-    get children() {
-      return children
-    },
-    get attributes() {
-      return attributes;
-    },
-    setAttribute: (name, value) => {
-      attributes[name] = value;
-    },
-    get lastElementChild() {
-      return children.at(-1)
-    },
-    nodeName,
-    get textContent() {
-      return value;
-    },
-    set textContent(val) {
-      value = val;
-    },
-    appendChild: (n) => {
-      if (n.type === "type") {
-        children.push(n)
-      }
-      
-      nodes.push(n)
-    }
-  };
-}
-
 const bench = new Benchmark((html, callback) => {
-  const root = parse(html, {
-    createTextNode: (value) => ({type: "text", value}),
-    createComment: (value) => ({type: "comment", value}),
-    createDocumentFragment: () => node('frag'),
-    createElementNS: (ns, tagName) => node(tagName),
-  });
-  console.log(JSON.stringify(root, null, 2));
+  const root = parse(html, Doc());
   callback(null);
 });
 

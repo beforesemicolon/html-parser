@@ -1,6 +1,6 @@
 {
   "name": "@beforesemicolon/html-parser",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "HTML parser for NodeJs and Browsers",
   "main": "dist/index.js",
   "types": "dist/index.d.js",
@@ -8,8 +8,8 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "build:min": "esbuild `find src \\( -name '*.ts' ! -name '*.spec.ts' \\)` --outdir=dist --platform=node --format=cjs --keep-names --minify --target=esnext\n",
-    "build:browser": "esbuild src/index.ts --bundle --minify --keep-names --sourcemap --target=esnext --outfile=dist/parser-client.min.js",
-    "build": "rm -rf dist && tsc && npm run build:min && npm run build:browser"
+    "build:browser": "esbuild src/client.ts --bundle --minify --keep-names --sourcemap --target=esnext --outfile=dist/parser-client.min.js",
+    "build": "npm test && rm -rf dist && tsc && npm run build:min && npm run build:browser"
   },
   "keywords": [
     "parser",

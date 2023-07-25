@@ -41,42 +41,29 @@ describe('parse', () => {
     some lose text at the end
   </body>
 </html>`;
-  const x = `
-<script type="text/javascript" src="http://rt.legolas-media.com/lgrt?ci=2&ti=11263&pbi=10888"></script><script type="text/javascript">
-                                //Generic method to read cookie
-                                function readCookie(name){
-                                    var nameEQ=name+"=";
-                                    var ca=document.cookie.split(';');
-                                    for(var i=0; i<ca.length;i++){
-                                      var c=ca[i];
-                                      while(c.charAt(0)==' ') c=c.substring(1,c.length);
-                                      if(c.indexOf(nameEQ)==0) return c.substring(nameEQ.length,c.length);
-                                }
-                                    return null;
-                                };
-                                //Turn lsg cookie into an array to be use with sectionKeywords param
-                                function lgAptGetSectionKeywords(){
-                                    //Read lsg cookie
-                                    var lsg=readCookie('lsg');
-                                    var lgApt=new Array();
-                                    if(lsg){
-                                      //Tokenize
-                                      var cookieTokens=lsg.split('s');
-                                
-                                      //Fill APT keywords array
-                                      for(var i=0;i <cookieTokens.length; i++){
-                                        if(cookieTokens[i]!='0') lgApt.push(cookieTokens[i]);
-                                      }
-                                    }
-                                    return lgApt;
-                                };
-                                </script>`
   
   it('should parse content and keep all white space intact', () => {
-    const root = parse(x);
+    const root = parse(basicPageMarkup);
 
-    // expect(stringifyNode(root)).toEqual(x);
-    console.log('-- done:', stringifyNode(root));
+    expect(stringifyNode(root)).toEqual(`
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    some lose text at the top
+    <!-- logo -->
+    <h1>Page</h1>
+    <script src="app.js" type="module">
+      const x = '<script>console.log(12)</script>';
+    </script>
+    some lose text at the end
+  </body>
+</html>`);
   });
   
   describe('should handle self-closing tag', () => {
@@ -130,12 +117,6 @@ describe('parse', () => {
         '<bfs-img src="img/circle" alt=""></bfs-img>');
     });
   });
-  
-  describe('should throw if strict is on', () => {
-    it('if forgot to close tag', () => {});
-    
-    it('if unbalanced HTML', () => {});
-  })
 
   describe('should handle open-closing tag', () => {
     it('when no inner content', () => {
@@ -207,10 +188,10 @@ describe('parse', () => {
       expect(stringifyNode(root)).toBe('<div><div>Some title</div></div>');
     });
     
-    // it('when no closing slash is present', () => {
-    //   const root = parse('<div><div>Some title<div><div>');
-    //   expect(stringifyNode(root)).toBe('<div></div><div></div>Some title<div></div><div></div>');
-    // })
+    it('when no closing slash is present', () => {
+      const root = parse('<div><div>Some title<div><div>');
+      expect(stringifyNode(root)).toBe('<div><div>Some title<div><div></div></div></div></div>');
+    })
 
   });
 
@@ -222,7 +203,7 @@ describe('parse', () => {
       expect(root.childNodes[0].textContent).toBe('some text');
     });
 
-    it('when in between tags', () => {
+    it('when in around tags', () => {
       const root = parse('some<hr/> text');
 
       expect(root.children.length).toBe(1);
@@ -297,8 +278,81 @@ describe('parse', () => {
     });
   })
 
-  describe('should handle SVG tags', () => {})
-
-  describe('should handle style tags', () => {})
+  describe('should handle SVG tags', () => {
+    it('when empty', () => {
+      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>');
+      
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].children.length).toBe(0);
+      expect(stringifyNode(root)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>');
+    });
+    
+    it('when with shapes inside', () => {
+      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg>');
+      
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].children.length).toBe(1);
+      expect(stringifyNode(root)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40"></circle></svg>');
+    });
+    
+    it('when with other svg tag inside', () => {
+      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4" /></svg></svg>');
+      
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].children.length).toBe(1);
+      expect(root.children[0].children[0].children.length).toBe(1);
+      expect(stringifyNode(root)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4"></circle></svg></svg>');
+    });
+  })
+  
+  it('should handle namespace URI correctly', () => {
+    const root = parse('<body><svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg><p>sample</p></body>');
+    
+    expect(root.children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+    expect(root.children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+    expect(root.children[0].children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+    expect(root.children[0].children[1].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+  });
+  
+  describe('should handle style tags', () => {
+    it('when empty', () => {
+      const root = parse('<style></style>');
+      
+      expect(root.children.length).toBe(1);
+      expect(stringifyNode(root)).toBe('<style></style>');
+    });
+    
+    it('when with content', () => {
+      const htmlStr = `<style>.sample {color: blue;}</style>`
+      const root = parse(htmlStr);
+      
+      expect(root.children.length).toBe(1);
+      expect(stringifyNode(root)).toBe('<style>.sample {color: blue;}</style>');
+    });
+    
+    it('when with content and attributes', () => {
+      const htmlStr = `<style class="style">.sample {color: blue;}</style>`
+      const root = parse(htmlStr);
+      
+      expect(root.children.length).toBe(1);
+      expect(stringifyNode(root)).toBe('<style class="style">.sample {color: blue;}</style>');
+    });
+    
+    it('when self-closed', () => {
+      const root = parse('<style/>');
+      
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].children.length).toBe(0);
+      expect(stringifyNode(root)).toBe('<style></style>');
+    });
+    
+    it('when self-closed with attributes', () => {
+      const root = parse('<style id="style" />');
+      
+      expect(root.children.length).toBe(1);
+      expect(root.children[0].children.length).toBe(0);
+      expect(stringifyNode(root)).toBe('<style id="style"></style>');
+    });
+  })
 
 })

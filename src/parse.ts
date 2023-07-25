@@ -15,6 +15,12 @@ export interface NodeHandlerDocument<F extends DocumentFragment> {
 	createElementNS: (ns: string, tagName: string) => ElementLike;
 }
 
+interface TempNode<F> {
+	tagName: string;
+	node: ElementLike | F;
+	ns: string;
+}
+
 export type NodeHandlerCallback = (node: ElementLike) => void;
 
 export type NodeHandler<F extends DocumentFragment> = NodeHandlerCallback | NodeHandlerDocument<F>
@@ -44,13 +50,6 @@ const setAttributes = (node: ElementLike, attributes: string) => {
 
 const isStyleOrScriptTag = (tagName: string) => /SCRIPT|STYLE/i.test(String(tagName));
 
-interface TempNode<F> {
-	tagName: string;
-	node: ElementLike | F;
-	ns: string;
-}
-
-// export const parse = <T extends DocumentFragment, N extends ElementLike>(markup: string, handler?: NodeHandler<T, N>): T => {
 export const parse = <T extends DocumentFragment>(markup: string, handler: NodeHandler<T> | null = null): T => {
 	const pattern = /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi;
 	let match: RegExpExecArray | null = null;
@@ -174,7 +173,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 	}
 
 	if (stack.length > 1) {
-		console.warn(`${stack.length - 1} tag(s) detected as not being closed properly. This may result in undesirable HTML rendering. Tag(s): [${stack.slice(1).map(n => n.tagName)}]`)
+		// console.warn(`${stack.length - 1} tag(s) detected as not being closed properly. This may result in undesirable HTML rendering. Tag(s): [${stack.slice(1).map(n => n.tagName)}]`)
 	}
 
 	if (lastIndex < markup.length) {

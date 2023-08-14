@@ -152,7 +152,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 							}
 						} else if(!selfClosingSlash) {
 							// could be that there is a script HTML string inside
-							// we need to track those so we don't mix them with the possible script closing tag
+							// we need to track those, so we don't mix them with the possible script closing tag
 							possibleSimilarOnesNested.push(name);
 						}
 					}

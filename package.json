@@ -1,9 +1,9 @@
 {
   "name": "@beforesemicolon/html-parser",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "HTML parser for NodeJs and Browsers",
   "main": "dist/index.js",
-  "types": "dist/index.d.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
     "test:coverage": "jest --coverage",
@@ -23,6 +23,9 @@
   "repository": {
     "url": "https://github.com/beforesemicolon/html-parser",
     "type": "git"
+  },
+  "peerDependencies": {
+    "jsdom": "^22.1.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.1",

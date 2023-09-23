@@ -63,7 +63,6 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 	while ((match = pattern.exec(markup)) !== null) {
 		const [_, comment, bangOrClosingSlash, tagName, attributes, selfClosingSlash] = match;
 		
-		// console.log({comment, tagName, selfClosingSlash, bangOrClosingSlash, lastEntry: stack.at(-1)?.tagName});
 		
 		if (bangOrClosingSlash === '!') {
 			lastIndex = pattern.lastIndex;
@@ -76,7 +75,6 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 		if (match.index >= lastIndex + 1) {
 			const text = markup.slice(lastIndex, match.index);
 			const node = doc.createTextNode(text);
-			// console.log('-- pre text', {text});
 			(stackLastItem.node as ElementLike).appendChild(node);
 			cb !== null && cb(node)
 		}
@@ -84,7 +82,6 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 		lastIndex = pattern.lastIndex;
 
 		if (comment) {
-			// console.log('-- comment', comment);
 			const node = doc.createComment(comment);
 			(stackLastItem.node as ElementLike).appendChild(node);
 			cb !== null && cb(node)
@@ -97,7 +94,6 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 			if (bangOrClosingSlash) {
 				if (new RegExp(tagName, 'i').test(stackLastItem.tagName)) {
 					stack.pop();
-					// console.log('-- closing', tagName, stack);
 				}
 				continue;
 			}
@@ -115,14 +111,12 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 				
 				(stackLastItem.node as ElementLike).appendChild(node);
 				cb !== null && cb(node)
-				// console.log('-- self closing', tagName, stack.at(-1)?.node.childNodes.length);
 				continue;
 			}
 			
 			const node = doc.createElementNS(ns, tagName) as ElementLike;
 			setAttributes(node, attributes);
 			
-			// console.log('-- opening', tagName);
 			
 			// scripts in particular can have html strings which does not impact
 			// the overall markup therefore we need a special lookup to find the closing tag
@@ -143,7 +137,6 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 							if (!possibleSimilarOnesNested.length) {
 								node.textContent = markupAhead.slice(0, tagMatch.index);
 								(stackLastItem.node as ElementLike).appendChild(node);
-								// console.log('-- closing', tagName);
 								lastIndex = lastIndex + exactTagPattern.lastIndex;
 								pattern.lastIndex = lastIndex; // move the pattern needle to start matching later in the string
 								break;
@@ -172,14 +165,9 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 		}
 	}
 
-	if (stack.length > 1) {
-		// console.warn(`${stack.length - 1} tag(s) detected as not being closed properly. This may result in undesirable HTML rendering. Tag(s): [${stack.slice(1).map(n => n.tagName)}]`)
-	}
-
 	if (lastIndex < markup.length) {
 		const text = markup.slice(lastIndex);
 		const node = doc.createTextNode(text);
-		// console.log('-- post text', {text});
 		(stack[0].node as ElementLike).appendChild(node);
 		cb !== null && cb(node)
 	}

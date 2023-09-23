@@ -76,7 +76,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 			const text = markup.slice(lastIndex, match.index);
 			const node = doc.createTextNode(text);
 			(stackLastItem.node as ElementLike).appendChild(node);
-			cb !== null && cb(node)
+			cb?.(node);
 		}
 
 		lastIndex = pattern.lastIndex;
@@ -84,7 +84,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 		if (comment) {
 			const node = doc.createComment(comment);
 			(stackLastItem.node as ElementLike).appendChild(node);
-			cb !== null && cb(node)
+			cb?.(node);
 			continue;
 		}
 		
@@ -110,7 +110,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 				setAttributes(node, attributes);
 				
 				(stackLastItem.node as ElementLike).appendChild(node);
-				cb !== null && cb(node)
+				cb?.(node);
 				continue;
 			}
 			
@@ -160,7 +160,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 			
 			(stackLastItem.node as ElementLike).appendChild(node);
 			
-			cb !== null && cb(node)
+			cb?.(node);
 			
 		}
 	}
@@ -169,7 +169,7 @@ export const parse = <T extends DocumentFragment>(markup: string, handler: NodeH
 		const text = markup.slice(lastIndex);
 		const node = doc.createTextNode(text);
 		(stack[0].node as ElementLike).appendChild(node);
-		cb !== null && cb(node)
+		cb?.(node);
 	}
 	
 	return stack[0].node as T;

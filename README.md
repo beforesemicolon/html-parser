@@ -139,9 +139,9 @@ Feel free to implement things however you like to fit your project. It is up to 
 
 ```ts
 interface NodeLike {
-	readonly nodeType: number;
-	readonly nodeName: string;
-	nodeValue: string;
+    readonly nodeType: number;
+    readonly nodeName: string;
+    nodeValue: string;
 }
 
 interface CommentLike extends NodeLike {}
@@ -149,8 +149,8 @@ interface CommentLike extends NodeLike {}
 interface TextLike extends NodeLike {}
 
 interface ElementLike extends NodeLike {
-	readonly tagName: string;
-	outerHTML: string; // not needed during parsing
+    readonly tagName: string;
+    outerHTML: string; // not needed during parsing
     textContent: string;
     childNodes: Array<NodeLike>;
     children: Array<ElementLike>;

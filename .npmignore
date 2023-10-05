@@ -6,3 +6,8 @@ doc
 **.tgz
 benchmark.js
 jest.config.js
+coverage
+.eslintrc.js
+.eslintignore
+.prettierignore
+.prettierrc

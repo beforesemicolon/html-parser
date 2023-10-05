@@ -1,31 +1,19 @@
 import selfClosingTags from './self-closing-tags.json'
+import { Doc, DocumentLike } from './Doc'
 
-export interface ElementLike extends Element {
-    setAttribute: (name: string, val: string) => void
-    lastElementChild: ElementLike
-    nodeName: string
-    textContent: string
-    appendChild: <P>(node: P) => P
-}
+type ElementLike = ReturnType<DocumentLike['createElementNS']>
+type DocumentFragmentLike = ReturnType<DocumentLike['createDocumentFragment']>
+type NodeLike =
+    | ReturnType<DocumentLike['createTextNode']>
+    | ReturnType<DocumentLike['createComment']>
 
-export interface NodeHandlerDocument<F extends DocumentFragment> {
-    createDocumentFragment: () => F
-    createTextNode: (text?: string) => ElementLike
-    createComment: (comment?: string) => ElementLike
-    createElementNS: (ns: string, tagName: string) => ElementLike
-}
-
-interface TempNode<F> {
+interface TempNode {
     tagName: string
-    node: ElementLike | F
+    node: DocumentFragmentLike | Element | ElementLike
     ns: string
 }
 
-export type NodeHandlerCallback = (node: ElementLike) => void
-
-export type NodeHandler<F extends DocumentFragment> =
-    | NodeHandlerCallback
-    | NodeHandlerDocument<F>
+export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 
 // URI based on https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS
 const NSURI: Record<string, string> = {
@@ -33,7 +21,7 @@ const NSURI: Record<string, string> = {
     SVG: 'http://www.w3.org/2000/svg',
 }
 
-const setAttributes = (node: ElementLike, attributes: string) => {
+const setAttributes = (node: Element | ElementLike, attributes: string) => {
     attributes = attributes?.trim()
     if (attributes) {
         const attrPattern =
@@ -53,21 +41,24 @@ const setAttributes = (node: ElementLike, attributes: string) => {
     }
 }
 
-const isStyleOrScriptTag = (tagName: string) =>
-    /SCRIPT|STYLE/i.test(String(tagName))
+type ParseReturn<T> = T extends DocumentLike
+    ? DocumentFragmentLike
+    : DocumentFragment
 
-export const parse = <T extends DocumentFragment>(
+export const parse = <D extends DocumentLike | Document>(
     markup: string,
-    handler: NodeHandler<T> | null = null
-): T => {
+    handler: D | NodeHandlerCallback = Doc as D
+): ParseReturn<D> => {
     const pattern =
         /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi
     let match: RegExpExecArray | null = null
     const doc = (
-        !handler || typeof handler === 'function' ? document : handler
-    ) as NodeHandlerDocument<T>
-    const cb = typeof handler === 'function' ? handler : null
-    const stack: Array<TempNode<T>> = [
+        !handler || typeof handler === 'function' ? Doc : handler
+    ) as DocumentLike
+    const cb = (typeof handler === 'function'
+        ? handler
+        : null) as unknown as NodeHandlerCallback
+    const stack: Array<TempNode> = [
         { tagName: 'frag', node: doc.createDocumentFragment(), ns: NSURI.HTML },
     ]
     let lastIndex = 0
@@ -87,13 +78,15 @@ export const parse = <T extends DocumentFragment>(
             continue
         }
 
-        const stackLastItem = stack.at(-1) as TempNode<T>
+        const stackLastItem = stack.at(-1) as TempNode
 
         // pre lingering text
         if (match.index >= lastIndex + 1) {
             const text = markup.slice(lastIndex, match.index)
             const node = doc.createTextNode(text)
-            ;(stackLastItem.node as ElementLike).appendChild(node)
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            stackLastItem?.node.appendChild(node as ElementLike)
             cb?.(node)
         }
 
@@ -101,7 +94,9 @@ export const parse = <T extends DocumentFragment>(
 
         if (comment) {
             const node = doc.createComment(comment)
-            ;(stackLastItem.node as ElementLike).appendChild(node)
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            stackLastItem?.node.appendChild(node as ElementLike)
             cb?.(node)
             continue
         }
@@ -115,7 +110,7 @@ export const parse = <T extends DocumentFragment>(
                 selfClosingSlash === '/'
 
             if (bangOrClosingSlash) {
-                if (new RegExp(tagName, 'i').test(stackLastItem.tagName)) {
+                if (new RegExp(tagName, 'i').test(stackLastItem?.tagName)) {
                     stack.pop()
                 }
                 continue
@@ -125,24 +120,26 @@ export const parse = <T extends DocumentFragment>(
                 ? NSURI.SVG
                 : /html/i.test(tagName)
                 ? NSURI.HTML
-                : stackLastItem.ns
+                : stackLastItem?.ns
 
             if (selfClosingTag) {
                 const node = doc.createElementNS(ns, tagName.toLowerCase())
 
                 setAttributes(node, attributes)
-                ;(stackLastItem.node as ElementLike).appendChild(node)
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                stackLastItem?.node.appendChild(node as ElementLike)
                 cb?.(node)
                 continue
             }
 
-            const node = doc.createElementNS(ns, tagName) as ElementLike
+            const node = doc.createElementNS(ns, tagName)
             setAttributes(node, attributes)
 
-            // scripts in particular can have html strings which does not impact
-            // the overall markup therefore we need a special lookup to find the closing tag
+            // scripts in particular can have html strings that do not need to be rendered.
+            // The overall markup therefore we need a special lookup to find the closing tag
             // without considering these possible HTML tag matches to be part of the final DOM
-            if (isStyleOrScriptTag(tagName)) {
+            if (/SCRIPT|STYLE/i.test(String(tagName))) {
                 // try to find the closing tag
                 const possibleSimilarOnesNested: string[] = []
                 const exactTagPattern = new RegExp(
@@ -165,9 +162,6 @@ export const parse = <T extends DocumentFragment>(
                                     0,
                                     tagMatch.index
                                 )
-                                ;(
-                                    stackLastItem.node as ElementLike
-                                ).appendChild(node)
                                 lastIndex =
                                     lastIndex + exactTagPattern.lastIndex
                                 pattern.lastIndex = lastIndex // move the pattern needle to start matching later in the string
@@ -190,7 +184,9 @@ export const parse = <T extends DocumentFragment>(
                 })
             }
 
-            ;(stackLastItem.node as ElementLike).appendChild(node)
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            stackLastItem?.node.appendChild(node as ElementLike)
 
             cb?.(node)
         }
@@ -199,9 +195,11 @@ export const parse = <T extends DocumentFragment>(
     if (lastIndex < markup.length) {
         const text = markup.slice(lastIndex)
         const node = doc.createTextNode(text)
-        ;(stack[0].node as ElementLike).appendChild(node)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        stack[0].node.appendChild(node as ElementLike)
         cb?.(node)
     }
 
-    return stack[0].node as T
+    return stack[0].node as ParseReturn<D>
 }

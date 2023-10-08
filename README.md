@@ -1,7 +1,5 @@
 # HTML Parser
-Simple, Fast, flexible, and lightweight HTML parser for Server and Browser parsing.
-
-Official HTML parser for [@beforesemicolon/html](https://www.npmjs.com/package/@beforesemicolon/html) and [@beforesemicolon/cube](https://www.npmjs.com/package/@beforesemicolon/cube)
+HTML parser for any Javascript runtime environment. Small, Fast, Easy to use, and highly customizable
 
 ## Motivation
 Most HTML parsers will force you to learn their Javascript API after the parse result. 
@@ -138,10 +136,11 @@ just a Document and Elements with the following fields.
 Feel free to implement things however you like to fit your project. It is up to you.
 
 ```ts
+// none of these fields are used during parsing
 interface NodeLike {
-    readonly nodeType: number;
-    readonly nodeName: string;
-    nodeValue: string;
+	readonly nodeType: number
+	readonly nodeName: string
+	nodeValue: string | null
 }
 
 interface CommentLike extends NodeLike {}
@@ -149,28 +148,62 @@ interface CommentLike extends NodeLike {}
 interface TextLike extends NodeLike {}
 
 interface ElementLike extends NodeLike {
-    readonly tagName: string;
-    outerHTML: string; // not needed during parsing
-    textContent: string;
-    childNodes: Array<NodeLike>;
-    children: Array<ElementLike>;
-    attributes: NamedNodeMapLike;
-    setAttribute: (name: string, value?: string) => void;
-    appendChild: (node: NodeLike | ElementLike | DocumentFragmentLike) => void;
+	readonly tagName: string
+	readonly namespaceURI: string
+	readonly outerHTML: string // not needed during parsing
+	readonly childNodes: Array<NodeLike>
+	readonly children: Array<ElementLike>
+	readonly attributes: NamedNodeMapLike
+	textContent: string
+	setAttribute: (name: string, value?: string) => void
+	appendChild: (node: NodeLike | ElementLike | DocumentFragmentLike) => void
 }
 
-
-interface DocumentFragmentLike extends Omit<ElementLike, 'outerHTML', 'setAttribute', 'attributes', 'textContent'> {
+interface DocumentLike {
+	createTextNode: (value: string) => TextLike
+	createComment: (value: string) => CommentLike
+	createDocumentFragment: () => DocumentFragmentLike
+	createElementNS: (ns: string, tagName: string) => ElementLike
 }
+```
 
-interface CustomDoc {
-    createTextNode: (nodeValue: string) => TextLike;
-    createComment: (nodeValue: string) => CommentLike;
-    createDocumentFragment: () => DocumentFragmentLik;
-    createElementNS: (ns: string, nodeName: string) => ElementLike;
+Here is the simplest example of a custom Document you can create
+```ts
+import {DocumentLike} from '@beforesemicolon/html-parser';
+
+const MyCustomDoc: DocumentLike = {
+    createTextNode: (nodeValue: string) => ({nodeValue, nodeType: 3}) as TextLike,
+    createComment: (nodeValue: string) => ({nodeValue, nodeType: 8}) as CommentLike,
+    createDocumentFragment: () => ({nodeName: "#fragment", nodeType: 11}) as DocumentFragmentLike,
+    createElementNS: (ns: string, nodeName: string) => {
+        const childNodes = [];
+        const children = [];
+        const attributes = {};
+        
+        return {
+            nodeName,
+            nodeType: 1,
+            tagName: nodeName,
+            namespaceURI: ns,
+            textContent: '',
+            childNodes,
+            children,
+            attributes,
+            setAttribute(name: string, value: string) {
+              attributes[name] = value
+            },
+            appendChild(node: NodeLike | ElementLike) {
+                if(node.nodeType === 11) {
+                  node.childNodes(n => this.appendChild(n))
+                }
+                
+                if(node.nodeType === 1) {
+                  children.push(node);
+                }
+                
+                childNodes.push(node);
+            }
+        } as ElementLike
+    }
 }
-
-const MyCustomDocument: CustomDoc = {
-	// logic here
-} 
 ```

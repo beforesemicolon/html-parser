@@ -1,17 +1,11 @@
-import selfClosingTags from './self-closing-tags.json'
-import { Doc, DocumentLike } from './Doc'
-
-type ElementLike = ReturnType<DocumentLike['createElementNS']>
-type DocumentFragmentLike = ReturnType<DocumentLike['createDocumentFragment']>
-type NodeLike =
-    | ReturnType<DocumentLike['createTextNode']>
-    | ReturnType<DocumentLike['createComment']>
-
-interface TempNode {
-    tagName: string
-    node: DocumentFragmentLike | Element | ElementLike
-    ns: string
-}
+import {
+    Doc,
+    DocumentLike,
+    ElementLike,
+    NodeLike,
+    DocumentFragmentLike,
+} from './Doc'
+import { selfClosingTags } from './self-closing-tags'
 
 export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 
@@ -58,8 +52,8 @@ export const parse = <D extends DocumentLike | Document>(
     const cb = (typeof handler === 'function'
         ? handler
         : null) as unknown as NodeHandlerCallback
-    const stack: Array<TempNode> = [
-        { tagName: 'frag', node: doc.createDocumentFragment(), ns: NSURI.HTML },
+    const stack: Array<ElementLike | DocumentFragmentLike> = [
+        doc.createDocumentFragment(),
     ]
     let lastIndex = 0
 
@@ -78,15 +72,13 @@ export const parse = <D extends DocumentLike | Document>(
             continue
         }
 
-        const stackLastItem = stack.at(-1) as TempNode
+        const stackLastItem = stack.at(-1)
 
         // pre lingering text
         if (match.index >= lastIndex + 1) {
             const text = markup.slice(lastIndex, match.index)
             const node = doc.createTextNode(text)
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            stackLastItem?.node.appendChild(node as ElementLike)
+            stackLastItem?.appendChild(node)
             cb?.(node)
         }
 
@@ -94,23 +86,16 @@ export const parse = <D extends DocumentLike | Document>(
 
         if (comment) {
             const node = doc.createComment(comment)
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            stackLastItem?.node.appendChild(node as ElementLike)
+            stackLastItem?.appendChild(node)
             cb?.(node)
             continue
         }
 
         if (tagName) {
-            const selfClosingTag =
-                (Boolean(tagName) &&
-                    (selfClosingTags as Record<string, string>)[
-                        tagName.toUpperCase()
-                    ]) ||
-                selfClosingSlash === '/'
-
             if (bangOrClosingSlash) {
-                if (new RegExp(tagName, 'i').test(stackLastItem?.tagName)) {
+                if (
+                    new RegExp(tagName, 'i').test(stackLastItem?.tagName || '')
+                ) {
                     stack.pop()
                 }
                 continue
@@ -120,15 +105,16 @@ export const parse = <D extends DocumentLike | Document>(
                 ? NSURI.SVG
                 : /html/i.test(tagName)
                 ? NSURI.HTML
-                : stackLastItem?.ns
+                : (stackLastItem as ElementLike)?.namespaceURI ?? NSURI.HTML
+
+            const selfClosingTag =
+                selfClosingTags().test(tagName) || selfClosingSlash === '/'
 
             if (selfClosingTag) {
-                const node = doc.createElementNS(ns, tagName.toLowerCase())
+                const node = doc.createElementNS(ns, tagName)
 
                 setAttributes(node, attributes)
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                stackLastItem?.node.appendChild(node as ElementLike)
+                stackLastItem?.appendChild(node)
                 cb?.(node)
                 continue
             }
@@ -136,10 +122,12 @@ export const parse = <D extends DocumentLike | Document>(
             const node = doc.createElementNS(ns, tagName)
             setAttributes(node, attributes)
 
+            stackLastItem?.appendChild(node)
+
             // scripts in particular can have html strings that do not need to be rendered.
             // The overall markup therefore we need a special lookup to find the closing tag
             // without considering these possible HTML tag matches to be part of the final DOM
-            if (/SCRIPT|STYLE/i.test(String(tagName))) {
+            if (/SCRIPT/i.test(String(tagName))) {
                 // try to find the closing tag
                 const possibleSimilarOnesNested: string[] = []
                 const exactTagPattern = new RegExp(
@@ -177,29 +165,18 @@ export const parse = <D extends DocumentLike | Document>(
                     }
                 }
             } else {
-                stack.push({
-                    tagName,
-                    node,
-                    ns,
-                })
+                stack.push(node)
             }
-
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            stackLastItem?.node.appendChild(node as ElementLike)
 
             cb?.(node)
         }
     }
 
     if (lastIndex < markup.length) {
-        const text = markup.slice(lastIndex)
-        const node = doc.createTextNode(text)
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        stack[0].node.appendChild(node as ElementLike)
+        const node = doc.createTextNode(markup.slice(lastIndex))
+        stack[0].appendChild(node)
         cb?.(node)
     }
 
-    return stack[0].node as ParseReturn<D>
+    return stack[0] as ParseReturn<D>
 }

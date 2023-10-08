@@ -1,4 +1,51 @@
-import selfClosingTags from './self-closing-tags.json'
+import { selfClosingTags } from './self-closing-tags'
+
+export interface NodeLike {
+    readonly nodeType: number
+    readonly nodeName: string
+    nodeValue: string | null
+}
+
+export interface CommentLike extends NodeLike {}
+
+export interface TextLike extends NodeLike {}
+
+export interface AttrLike {
+    name: string
+    value: string
+}
+
+export interface NamedNodeMapLike {
+    getNamedItem(name: string): AttrLike | null
+    setNamedItem(attr: AttrLike): AttrLike
+    removeNamedItem(name: string): AttrLike | null
+    item(index: number): AttrLike | null
+    length: number
+    [Symbol.iterator](): IterableIterator<AttrLike>
+}
+
+export interface ElementLike extends NodeLike {
+    readonly tagName: string
+    readonly namespaceURI: string
+    readonly outerHTML: string
+    readonly childNodes: Array<NodeLike>
+    readonly children: Array<ElementLike>
+    readonly attributes: NamedNodeMapLike
+    textContent: string
+    setAttribute: (name: string, value?: string) => void
+    appendChild: (node: NodeLike | ElementLike | DocumentFragmentLike) => void
+}
+
+export interface DocumentFragmentLike
+    extends Omit<
+        ElementLike,
+        | 'outerHTML'
+        | 'setAttribute'
+        | 'attributes'
+        | 'textContent'
+        | 'nodeValue'
+        | 'namespaceURI'
+    > {}
 
 export interface DocumentLike {
     createTextNode: (value: string) => TextLike
@@ -7,9 +54,7 @@ export interface DocumentLike {
     createElementNS: (ns: string, tagName: string) => ElementLike
 }
 
-type AttrLike = { name: string; value: string }
-
-class NodeLike {
+class Node implements NodeLike {
     #value = ''
 
     get nodeValue() {
@@ -35,7 +80,7 @@ class NodeLike {
     }
 }
 
-class TextLike extends NodeLike {
+class Text extends Node implements TextLike {
     get nodeType() {
         return 3
     }
@@ -45,7 +90,7 @@ class TextLike extends NodeLike {
     }
 }
 
-class CommentLike extends NodeLike {
+class Comment extends Node implements CommentLike {
     get nodeType() {
         return 8
     }
@@ -55,7 +100,7 @@ class CommentLike extends NodeLike {
     }
 }
 
-class NamedNodeMapLike {
+class NamedNodeMap implements NamedNodeMapLike {
     #attributes: Map<string, AttrLike> = new Map()
 
     get length() {
@@ -67,7 +112,7 @@ class NamedNodeMapLike {
     }
 
     getNamedItem(name: string) {
-        return this.#attributes.get(name)
+        return this.#attributes.get(name) ?? null
     }
 
     setNamedItem(attr: AttrLike) {
@@ -85,11 +130,12 @@ class NamedNodeMapLike {
     }
 }
 
-class ElementLike extends NodeLike {
+class Element extends Node implements ElementLike {
     #tag = ''
     #children: Set<ElementLike> = new Set()
     #nodes: Set<NodeLike | ElementLike> = new Set()
-    #attributes = new NamedNodeMapLike()
+    #attributes = new NamedNodeMap()
+    #ns: string
 
     get nodeType() {
         return 1
@@ -101,6 +147,10 @@ class ElementLike extends NodeLike {
 
     get tagName() {
         return this.#tag
+    }
+
+    get namespaceURI() {
+        return this.#ns
     }
 
     get childNodes() {
@@ -141,7 +191,7 @@ class ElementLike extends NodeLike {
 
         str += '>'
 
-        if (!(selfClosingTags as Record<string, string>)[this.#tag]) {
+        if (!selfClosingTags().test(this.#tag)) {
             if (this.#nodes.size) {
                 str += Array.from(this.#nodes.values())
                     .map((n) => {
@@ -165,9 +215,10 @@ class ElementLike extends NodeLike {
         return str
     }
 
-    constructor(tagName = '') {
+    constructor(ns: string, tagName = '') {
         super('')
         this.#tag = tagName
+        this.#ns = ns
     }
 
     setAttribute(name: string, value: string = '') {
@@ -187,20 +238,20 @@ class ElementLike extends NodeLike {
     ) {
         if (
             !(
-                node instanceof NodeLike ||
+                node instanceof Node ||
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                node instanceof ElementLike ||
+                node instanceof Element ||
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                node instanceof DocumentFragmentLike
+                node instanceof DocumentFragment
             )
         ) {
             return
         }
 
         if (node.nodeType === 11) {
-            ;(node as DocumentFragmentLike).childNodes.forEach((n) => {
+            ;(node as DocumentFragment).childNodes.forEach((n) => {
                 if ((n as ElementLike).nodeType === 1) {
                     this.#children.add(n as ElementLike)
                 }
@@ -211,14 +262,14 @@ class ElementLike extends NodeLike {
         }
 
         if (node.nodeType === 1) {
-            this.#children.add(node as ElementLike)
+            this.#children.add(node as Element)
         }
 
         this.#nodes.add(node as NodeLike)
     }
 }
 
-class DocumentFragmentLike extends ElementLike {
+class DocumentFragment extends Element implements DocumentFragmentLike {
     get nodeType() {
         return 11
     }
@@ -241,9 +292,9 @@ class DocumentFragmentLike extends ElementLike {
 }
 
 export const Doc: DocumentLike = {
-    createTextNode: (nodeValue = '') => new TextLike(nodeValue),
-    createComment: (nodeValue = '') => new CommentLike(nodeValue),
-    createDocumentFragment: () => new DocumentFragmentLike('#fragment'),
+    createTextNode: (nodeValue = '') => new Text(nodeValue),
+    createComment: (nodeValue = '') => new Comment(nodeValue),
+    createDocumentFragment: () => new DocumentFragment('#fragment'),
     createElementNS: (ns: string, name: string) =>
-        new ElementLike(name.toUpperCase()),
+        new Element(ns, name.toUpperCase()),
 }

@@ -163,9 +163,13 @@ class Element extends Node implements ElementLike {
     get textContent() {
         return this.#nodes.size
             ? Array.from(this.#nodes.values())
-                  .map(
-                      (n) => (n as ElementLike).textContent ?? n.nodeValue ?? ''
-                  )
+                  .map((n) => {
+                      if (n.nodeType === 8) {
+                          return ''
+                      }
+
+                      return (n as ElementLike).textContent ?? n.nodeValue ?? ''
+                  })
                   .join('')
             : this.nodeValue
     }

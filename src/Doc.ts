@@ -39,12 +39,7 @@ export interface ElementLike extends NodeLike {
 export interface DocumentFragmentLike
     extends Omit<
         ElementLike,
-        | 'outerHTML'
-        | 'setAttribute'
-        | 'attributes'
-        | 'textContent'
-        | 'nodeValue'
-        | 'namespaceURI'
+        'outerHTML' | 'setAttribute' | 'attributes' | 'namespaceURI'
     > {}
 
 export interface DocumentLike {
@@ -168,7 +163,9 @@ class Element extends Node implements ElementLike {
     get textContent() {
         return this.#nodes.size
             ? Array.from(this.#nodes.values())
-                  .map((n) => n.nodeValue)
+                  .map(
+                      (n) => (n as ElementLike).textContent ?? n.nodeValue ?? ''
+                  )
                   .join('')
             : this.nodeValue
     }
@@ -191,7 +188,7 @@ class Element extends Node implements ElementLike {
 
         str += '>'
 
-        if (!selfClosingTags().test(this.#tag)) {
+        if (!selfClosingTags().test(tag)) {
             if (this.#nodes.size) {
                 str += Array.from(this.#nodes.values())
                     .map((n) => {
@@ -251,7 +248,7 @@ class Element extends Node implements ElementLike {
         }
 
         if (node.nodeType === 11) {
-            ;(node as DocumentFragment).childNodes.forEach((n) => {
+            ;(node as Element).childNodes.forEach((n) => {
                 if ((n as ElementLike).nodeType === 1) {
                     this.#children.add(n as ElementLike)
                 }
@@ -279,12 +276,6 @@ class DocumentFragment extends Element implements DocumentFragmentLike {
     outerHTML: undefined
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    nodeValue: undefined
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    textContent: undefined
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     setAttribute: undefined
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -294,7 +285,8 @@ class DocumentFragment extends Element implements DocumentFragmentLike {
 export const Doc: DocumentLike = {
     createTextNode: (nodeValue = '') => new Text(nodeValue),
     createComment: (nodeValue = '') => new Comment(nodeValue),
-    createDocumentFragment: () => new DocumentFragment('#fragment'),
+    createDocumentFragment: () =>
+        new DocumentFragment('http://www.w3.org/1999/xhtml', '#fragment'),
     createElementNS: (ns: string, name: string) =>
         new Element(ns, name.toUpperCase()),
 }

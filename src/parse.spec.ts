@@ -86,7 +86,7 @@ describe('parse', () => {
     });
 
     it('when custom/new self closing tag with a self closing slash', () => {
-      const root = parse('<bfs-img src="img/circle" alt=""/>', document);
+      const root = parse('<bfs-img src="img/circle" alt=""/>');
       const root2 = parse('<bfs-img src="img/circle" alt=""/>', document);
 
       expect(root2.children.length).toBe(1);
@@ -104,7 +104,7 @@ describe('parse', () => {
     });
 
     it('when repeated next to each other', () => {
-      const root = parse('<meta charset="UTF-8">\n<meta http-equiv="X-UA-Compatible" content="ie=edge">', document);
+      const root = parse('<meta charset="UTF-8">\n<meta http-equiv="X-UA-Compatible" content="ie=edge">');
       const root2 = parse('<meta charset="UTF-8">\n<meta http-equiv="X-UA-Compatible" content="ie=edge">', document);
 
       expect(root.children.length).toBe(2);
@@ -128,7 +128,7 @@ describe('parse', () => {
     });
 
     it('when mixed of know html and custom self-closing tag', () => {
-      const root = parse('<meta charset="UTF-8">\n<bfs-img src="img/circle" alt=""/>', document);
+      const root = parse('<meta charset="UTF-8">\n<bfs-img src="img/circle" alt=""/>');
       const root2 = parse('<meta charset="UTF-8">\n<bfs-img src="img/circle" alt=""/>', document);
 
       expect(root2.children.length).toBe(2);
@@ -154,7 +154,7 @@ describe('parse', () => {
 
   describe('should handle open-closing tag', () => {
     it('when no inner content', () => {
-      const root = parse('<p></p>', document);
+      const root = parse('<p></p>');
       const root2 = parse('<p></p>', document);
 
       expect(root.children.length).toBe(1);
@@ -168,7 +168,7 @@ describe('parse', () => {
     });
 
     it('with text inside', () => {
-      const root = parse('<p>Lorem ipsum dolor.</p>', document);
+      const root = parse('<p>Lorem ipsum dolor.</p>');
       const root2 = parse('<p>Lorem ipsum dolor.</p>', document);
 
       expect(root.children.length).toBe(1);
@@ -188,7 +188,7 @@ describe('parse', () => {
     });
 
     it('with comment inside', () => {
-      const root = parse('<p><!-- content goes here --></p>', document);
+      const root = parse('<p><!-- content goes here --></p>');
       const root2 = parse('<p><!-- content goes here --></p>', document);
 
       expect(root.children.length).toBe(1);
@@ -208,7 +208,7 @@ describe('parse', () => {
     });
 
     it('with self closing tag inside', () => {
-      const root = parse('<head><meta charset="UTF-8"></head>', document);
+      const root = parse('<head><meta charset="UTF-8"></head>');
       const root2 = parse('<head><meta charset="UTF-8"></head>', document);
 
       expect(root.children.length).toBe(1);
@@ -228,7 +228,7 @@ describe('parse', () => {
     });
 
     it('with different open-closing tag inside', () => {
-      const root = parse('<head><title>Some title</title></head>', document);
+      const root = parse('<head><title>Some title</title></head>');
       const root2 = parse('<head><title>Some title</title></head>', document);
 
       expect(root.children.length).toBe(1);
@@ -248,7 +248,7 @@ describe('parse', () => {
     });
 
     it('with similar open-closing tag inside', () => {
-      const root = parse('<div><div>Some title</div></div>', document);
+      const root = parse('<div><div>Some title</div></div>');
       const root2 = parse('<div><div>Some title</div></div>', document);
 
       expect(root.children.length).toBe(1);
@@ -268,7 +268,7 @@ describe('parse', () => {
     });
     
     it('when no closing slash is present', () => {
-      const root = parse('<div><div>Some title<div><div>', document);
+      const root = parse('<div><div>Some title<div><div>');
       const root2 = parse('<div><div>Some title<div><div>', document);
       
       expect(stringifyNode(root)).toBe('<div><div>Some title<div><div></div></div></div></div>');
@@ -279,17 +279,17 @@ describe('parse', () => {
 
   describe('should handle text', () => {
     it('when passed alone', () => {
-      const root = parse('some text', document);
+      const root = parse('some text');
       const root2 = parse('some text', document);
 
       expect(root.children.length).toBe(0);
       expect(root2.children.length).toBe(0);
-      expect(root.childNodes[0].textContent).toBe('some text');
-      expect(root2.childNodes[0].textContent).toBe('some text');
+      expect(root.childNodes[0].nodeValue).toBe('some text');
+      expect(root2.childNodes[0].nodeValue).toBe('some text');
     });
 
     it('when in around tags', () => {
-      const root = parse('some<hr/> text', document);
+      const root = parse('some<hr/> text');
       const root2 = parse('some<hr/> text', document);
 
       expect(root.children.length).toBe(1);
@@ -301,7 +301,7 @@ describe('parse', () => {
     });
 
     it('when after a tag', () => {
-      const root = parse('<hr/>some text', document);
+      const root = parse('<hr/>some text');
       const root2 = parse('<hr/>some text', document);
 
       expect(root.children.length).toBe(1);
@@ -313,7 +313,7 @@ describe('parse', () => {
     });
 
     it('when before a tag', () => {
-      const root = parse('some text<hr/>', document);
+      const root = parse('some text<hr/>');
       const root2 = parse('some text<hr/>', document);
 
       expect(root.children.length).toBe(1);
@@ -338,7 +338,7 @@ describe('parse', () => {
 
     it('when with content', () => {
       const htmlStr = `<script>console.log('works')</script>`
-      const root = parse(htmlStr, document);
+      const root = parse(htmlStr);
       const root2 = parse(htmlStr, document);
 
       expect(root.children.length).toBe(1);
@@ -349,7 +349,7 @@ describe('parse', () => {
 
     it('when with content and attributes', () => {
       const htmlStr = `<script type="module">console.log('works')</script>`
-      const root = parse(htmlStr, document);
+      const root = parse(htmlStr);
       const root2 = parse(htmlStr, document);
 
       expect(root.children.length).toBe(1);
@@ -358,7 +358,7 @@ describe('parse', () => {
 
     it('when with html string in content', () => {
       const htmlStr = `<script type="module">const scriptStr = '<script>console.log("works")</script>';</script>`
-      const root = parse(htmlStr, document);
+      const root = parse(htmlStr);
       const root2 = parse(htmlStr, document);
 
       expect(root.children.length).toBe(1);
@@ -370,7 +370,7 @@ describe('parse', () => {
     });
 
     it('when self-closed', () => {
-      const root = parse('<script/>', document);
+      const root = parse('<script/>');
       const root2 = parse('<script/>', document);
 
       expect(root.children.length).toBe(1);
@@ -382,7 +382,7 @@ describe('parse', () => {
     });
 
     it('when self-closed with attributes', () => {
-      const root = parse('<script src="app.js" type="module"/>', document);
+      const root = parse('<script src="app.js" type="module"/>');
       const root2 = parse('<script src="app.js" type="module"/>', document);
 
       expect(root.children.length).toBe(1);
@@ -396,7 +396,7 @@ describe('parse', () => {
 
   describe('should handle SVG tags', () => {
     it('when empty', () => {
-      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>', document);
+      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>');
       const root2 = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>', document);
       
       expect(root.children.length).toBe(1);
@@ -408,7 +408,7 @@ describe('parse', () => {
     });
     
     it('when with shapes inside', () => {
-      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg>', document);
+      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg>');
       const root2 = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg>', document);
       
       expect(root.children.length).toBe(1);
@@ -420,7 +420,7 @@ describe('parse', () => {
     });
     
     it('when with other svg tag inside', () => {
-      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4" /></svg></svg>', document);
+      const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4" /></svg></svg>');
       const root2 = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4" /></svg></svg>', document);
       
       expect(root.children.length).toBe(1);
@@ -435,7 +435,7 @@ describe('parse', () => {
   })
   
   it('should handle namespace URI correctly', () => {
-    const root = parse('<body><svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg><p>sample</p></body>', document);
+    const root = parse('<body><svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg><p>sample</p></body>');
     const root2 = parse('<body><svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg><p>sample</p></body>', document);
     
     expect(root.children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
@@ -450,7 +450,7 @@ describe('parse', () => {
   
   describe('should handle style tags', () => {
     it('when empty', () => {
-      const root = parse('<style></style>', document);
+      const root = parse('<style></style>');
       const root2 = parse('<style></style>', document);
       
       expect(root.children.length).toBe(1);
@@ -461,7 +461,7 @@ describe('parse', () => {
     
     it('when with content', () => {
       const htmlStr = `<style>.sample {color: blue;}</style>`
-      const root = parse(htmlStr, document);
+      const root = parse(htmlStr);
       const root2 = parse(htmlStr, document);
       
       expect(root.children.length).toBe(1);
@@ -472,7 +472,7 @@ describe('parse', () => {
     
     it('when with content and attributes', () => {
       const htmlStr = `<style class="style">.sample {color: blue;}</style>`
-      const root = parse(htmlStr, document);
+      const root = parse(htmlStr);
       const root2 = parse(htmlStr, document);
       
       expect(root.children.length).toBe(1);
@@ -482,7 +482,7 @@ describe('parse', () => {
     });
     
     it('when self-closed', () => {
-      const root = parse('<style/>', document);
+      const root = parse('<style/>');
       const root2 = parse('<style/>', document);
       
       expect(root.children.length).toBe(1);
@@ -494,7 +494,7 @@ describe('parse', () => {
     });
     
     it('when self-closed with attributes', () => {
-      const root = parse('<style id="style" />', document);
+      const root = parse('<style id="style" />');
       const root2 = parse('<style id="style" />', document);
       
       expect(root.children.length).toBe(1);
@@ -505,5 +505,13 @@ describe('parse', () => {
       expect(stringifyNode(root2)).toBe('<style id="style"></style>');
     });
   })
-
+  
+  it('should handle commented out HTML', () => {
+    const root = parse('<!-- <style id="style" /> -->');
+    const root2 = parse('<!-- <style id="style" /> -->', document);
+    
+    expect(stringifyNode(root)).toBe('<!-- <style id="style" /> -->');
+    expect(stringifyNode(root2)).toBe('<!-- <style id="style" /> -->');
+  });
+  
 })

@@ -146,10 +146,10 @@ export const parse = <D extends DocumentLike | Document>(
                     if (new RegExp(tagName, 'i').test(name)) {
                         if (closingSlash) {
                             if (!possibleSimilarOnesNested.length) {
-                                node.textContent = markupAhead.slice(
-                                    0,
-                                    tagMatch.index
+                                const textNode = doc.createTextNode(
+                                    markupAhead.slice(0, tagMatch.index)
                                 )
+                                node.appendChild(textNode)
                                 lastIndex =
                                     lastIndex + exactTagPattern.lastIndex
                                 pattern.lastIndex = lastIndex // move the pattern needle to start matching later in the string

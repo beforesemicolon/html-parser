@@ -39,7 +39,7 @@ type ParseReturn<T> = T extends DocumentLike
     ? DocumentFragmentLike
     : DocumentFragment
 
-export const parse = <D extends DocumentLike | Document>(
+export const parse = <D extends Partial<DocumentLike | Document>>(
     markup: string,
     handler: D | NodeHandlerCallback = Doc as D
 ): ParseReturn<D> => {

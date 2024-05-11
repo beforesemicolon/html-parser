@@ -130,80 +130,45 @@ parse(aReallyMassimeHTMLString, document);
 ```
 
 ### Creating your custom handler
-You can import the `DocumentLike` type and use as guide but in general, the parser expect
-just a Document and Elements with the following fields.
+The best thing about this parser is the ability to crate your own handler
+to transform HTML into anything you like.
 
-Feel free to implement things however you like to fit your project. It is up to you.
+Here is an example of a simple implementation you can start from.
 
 ```ts
-// none of these fields are used during parsing
-interface NodeLike {
-	readonly nodeType: number
-	readonly nodeName: string
-	nodeValue: string | null
+const MyCustomDoc = {
+	createComment: (value: string) => ({type: 'comment', value}),
+	createTextNode: (value: string) => ({type: 'text', value}),
+	createDocumentFragment: () => {
+		const children: unknown[] = []
+
+		return {
+			type: 'fragment',
+			children,
+			appendChild: (node: unknown) => {
+				children.push(node)
+			}
+		}
+	},
+	createElementNS: (namespace: string, tagName: string) => {
+		const children: unknown[] = []
+		const attributes: Record<string, unknown> = {}
+
+		return {
+			namespace,
+			tagName,
+			children,
+			attributes,
+			type: 'node',
+			appendChild(node: unknown) {
+				children.push(node)
+			},
+			setAttribute(name: string, value: string) {
+				attributes[name] = value;
+			}
+		}
+	},
 }
 
-interface CommentLike extends NodeLike {}
-
-interface TextLike extends NodeLike {}
-
-interface ElementLike extends NodeLike {
-	readonly tagName: string
-	readonly namespaceURI: string
-	readonly outerHTML: string // not needed during parsing
-	readonly childNodes: Array<NodeLike>
-	readonly children: Array<ElementLike>
-	readonly attributes: NamedNodeMapLike
-	textContent: string
-	setAttribute: (name: string, value?: string) => void
-	appendChild: (node: NodeLike | ElementLike | DocumentFragmentLike) => void
-}
-
-interface DocumentLike {
-	createTextNode: (value: string) => TextLike
-	createComment: (value: string) => CommentLike
-	createDocumentFragment: () => DocumentFragmentLike
-	createElementNS: (ns: string, tagName: string) => ElementLike
-}
-```
-
-Here is the simplest example of a custom Document you can create
-```ts
-import {DocumentLike} from '@beforesemicolon/html-parser';
-
-const MyCustomDoc: DocumentLike = {
-    createTextNode: (nodeValue: string) => ({nodeValue, nodeType: 3}) as TextLike,
-    createComment: (nodeValue: string) => ({nodeValue, nodeType: 8}) as CommentLike,
-    createDocumentFragment: () => ({nodeName: "#fragment", nodeType: 11}) as DocumentFragmentLike,
-    createElementNS: (ns: string, nodeName: string) => {
-        const childNodes = [];
-        const children = [];
-        const attributes = {};
-        
-        return {
-            nodeName,
-            nodeType: 1,
-            tagName: nodeName,
-            namespaceURI: ns,
-            textContent: '',
-            childNodes,
-            children,
-            attributes,
-            setAttribute(name: string, value: string) {
-              attributes[name] = value
-            },
-            appendChild(node: NodeLike | ElementLike) {
-                if(node.nodeType === 11) {
-                  node.childNodes(n => this.appendChild(n))
-                }
-                
-                if(node.nodeType === 1) {
-                  children.push(node);
-                }
-                
-                childNodes.push(node);
-            }
-        } as ElementLike
-    }
-}
+const result = parse<typeof MyCustomDoc>(`...`, MyCustomDoc);
 ```

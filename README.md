@@ -3,7 +3,7 @@ HTML parser for any Javascript runtime environment. Small, Fast, Easy to use, an
 
 [![npm](https://img.shields.io/npm/v/%40beforesemicolon%2Fhtml-parser)](https://www.npmjs.com/package/@beforesemicolon/html-parser)
 ![npm](https://img.shields.io/npm/l/%40beforesemicolon%2Fhtml-parser)
-[![Test](https://github.com/beforesemicolon/html/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/beforesemicolon/html/actions/workflows/test.yml)
+[![Test](https://github.com/beforesemicolon/html-parser/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/beforesemicolon/html-parser/actions/workflows/test.yml)
 
 ## Motivation
 Most HTML parsers will force you to learn their Javascript API after the parse result. 

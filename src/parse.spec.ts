@@ -1,5 +1,4 @@
-import {parse} from './parse';
-import {CommentLike} from "./Doc";
+import {parse} from './parse.ts';
 
 function stringifyNode(node: any): string {
 	if (node) {

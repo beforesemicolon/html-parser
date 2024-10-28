@@ -34,10 +34,10 @@ npm install @beforesemicolon/html-parser
 <head>
 
   <!-- Grab the latest version -->
-  <script src="https://unpkg.com/@beforesemicolon/html-parser/dist/parser-client.min.js"></script>
+  <script src="https://unpkg.com/@beforesemicolon/html-parser/dist/client.js"></script>
 
   <!-- Or a specific version -->
-  <script src="https://unpkg.com/@beforesemicolon/html-parser@1.0.0/dist/parser-client.min.js"></script>
+  <script src="https://unpkg.com/@beforesemicolon/html-parser@1.0.0/dist/client.js"></script>
 
 </head>
 <body></body>

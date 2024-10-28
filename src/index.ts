@@ -1,2 +1,2 @@
-export * from './parse'
-export * from './Doc'
+export * from './parse.ts'
+export * from './Doc.ts'

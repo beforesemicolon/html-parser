@@ -1,4 +1,4 @@
-import { selfClosingTags } from './self-closing-tags'
+import { selfClosingTags } from './self-closing-tags.ts'
 
 export interface NodeLike {
     readonly nodeType: number

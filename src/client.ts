@@ -1,5 +1,5 @@
-import { parse } from './parse'
-import { Doc } from './Doc'
+import { parse } from './parse.ts'
+import { Doc } from './Doc.ts'
 
 if (window) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment

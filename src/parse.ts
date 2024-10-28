@@ -4,8 +4,8 @@ import {
     ElementLike,
     NodeLike,
     DocumentFragmentLike,
-} from './Doc'
-import { selfClosingTags } from './self-closing-tags'
+} from './Doc.ts'
+import { selfClosingTags } from './self-closing-tags.ts'
 
 export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 

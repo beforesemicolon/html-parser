@@ -400,7 +400,9 @@ describe('parse', () => {
 			const root2 = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>', document);
 
 			expect(root.children.length).toBe(1);
+			expect(root.children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root2.children.length).toBe(1);
+			expect(root2.children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root.children[0].children.length).toBe(0);
 			expect(root2.children[0].children.length).toBe(0);
 			expect(stringifyNode(root)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"></svg>');
@@ -412,9 +414,15 @@ describe('parse', () => {
 			const root2 = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40" /></svg>', document);
 
 			expect(root.children.length).toBe(1);
+			expect(root.children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root2.children.length).toBe(1);
+			expect(root2.children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			
 			expect(root.children[0].children.length).toBe(1);
+			expect(root.children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root2.children[0].children.length).toBe(1);
+			expect(root2.children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			
 			expect(stringifyNode(root)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40"></circle></svg>');
 			expect(stringifyNode(root2)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><circle cx="50" cy="50" r="40"></circle></svg>');
 		});
@@ -422,15 +430,73 @@ describe('parse', () => {
 		it('when with other svg tag inside', () => {
 			const root = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4" /></svg></svg>');
 			const root2 = parse('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4" /></svg></svg>', document);
-
+			
 			expect(root.children.length).toBe(1);
+			expect(root.children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root2.children.length).toBe(1);
+			expect(root2.children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			
 			expect(root.children[0].children.length).toBe(1);
+			expect(root.children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root2.children[0].children.length).toBe(1);
+			expect(root2.children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			
 			expect(root.children[0].children[0].children.length).toBe(1);
+			expect(root.children[0].children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
 			expect(root2.children[0].children[0].children.length).toBe(1);
+			expect(root2.children[0].children[0].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			
 			expect(stringifyNode(root)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4"></circle></svg></svg>');
 			expect(stringifyNode(root2)).toBe('<svg viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg" stroke="red" fill="black"><svg viewBox="0 0 10 10" x="200" width="100"><circle cx="5" cy="5" r="4"></circle></svg></svg>');
+		});
+		
+		it('with style tag inside', () => {
+			const root = parse('<svg version="1.1" xmlns="http://www.w3.org/2000/svg"\n' +
+					'\t viewBox="0 0 240 240" xml:space="preserve">\n' +
+					'<style type="text/css">\n' +
+					'\t.st0{fill-rule:evenodd;clip-rule:evenodd;}\n' +
+					'</style>\n' +
+					'<g>\n' +
+					'\t<path class="st0" d="M60.7,116.9l33.7,39l98.6-117c7.4-7.9,19,0.5,13.2,9.5l-97,148.1c-7.4,9.5-17.4,10.5-25.8,1.1l-49-58.5\n' +
+					'\t\tC24.9,125.4,49.1,105.9,60.7,116.9z"/>\n' +
+					'</g>\n' +
+					'</svg>' +
+				'<p>some text</p>');
+			const root2 = parse('<svg version="1.1" xmlns="http://www.w3.org/2000/svg"\n' +
+				'\t viewBox="0 0 240 240" xml:space="preserve">\n' +
+				'<style type="text/css">\n' +
+				'\t.st0{fill-rule:evenodd;clip-rule:evenodd;}\n' +
+				'</style>\n' +
+				'<g>\n' +
+				'\t<path class="st0" d="M60.7,116.9l33.7,39l98.6-117c7.4-7.9,19,0.5,13.2,9.5l-97,148.1c-7.4,9.5-17.4,10.5-25.8,1.1l-49-58.5\n' +
+				'\t\tC24.9,125.4,49.1,105.9,60.7,116.9z"/>\n' +
+				'</g>\n' +
+				'</svg>' + '<p>some text</p>', document);
+			
+			const svg = root.children[0];
+			const p = root.children[1];
+			const style = svg.children[0];
+			const g = svg.children[1];
+			const path = g.children[0];
+			
+			expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			expect(p.namespaceURI).toBe('http://www.w3.org/1999/xhtml')
+			expect(style.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			expect(g.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			expect(path.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			
+			const svg2 = root2.children[0];
+			const p2 = root2.children[1];
+			const style2 = svg2.children[0];
+			const g2 = svg2.children[1];
+			const path2 = g2.children[0];
+			
+			expect(svg2.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			expect(p2.namespaceURI).toBe('http://www.w3.org/1999/xhtml')
+			expect(style2.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			expect(g2.namespaceURI).toBe('http://www.w3.org/2000/svg')
+			expect(path2.namespaceURI).toBe('http://www.w3.org/2000/svg')
+		
 		});
 	})
 

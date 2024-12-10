@@ -154,12 +154,12 @@ const MyCustomDoc = {
 			}
 		}
 	},
-	createElementNS: (namespace: string, tagName: string) => {
+	createElementNS: (namespaceURI: string, tagName: string) => {
 		const children: unknown[] = []
 		const attributes: Record<string, unknown> = {}
 
 		return {
-			namespace,
+			namespaceURI, // important to ALWAYS include
 			tagName,
 			children,
 			attributes,

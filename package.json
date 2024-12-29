@@ -1,6 +1,6 @@
 {
   "name": "@beforesemicolon/html-parser",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "HTML parser for any Javascript runtime environment",
   "type": "module",
   "types": "./dist/types/index.d.ts",

@@ -13,6 +13,7 @@ export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 const NSURI: Record<string, string> = {
     HTML: 'http://www.w3.org/1999/xhtml',
     SVG: 'http://www.w3.org/2000/svg',
+    MATH: 'http://www.w3.org/1998/Math/MathML',
 }
 
 const setAttributes = (node: Element | ElementLike, attributes: string) => {
@@ -103,6 +104,8 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
 
             const ns = /svg/i.test(tagName)
                 ? NSURI.SVG
+                : /math/i.test(tagName)
+                ? NSURI.MATH
                 : /html/i.test(tagName)
                 ? NSURI.HTML
                 : (stackLastItem as ElementLike)?.namespaceURI ?? NSURI.HTML

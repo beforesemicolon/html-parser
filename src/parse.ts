@@ -130,7 +130,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
             // scripts in particular can have html strings that do not need to be rendered.
             // The overall markup therefore we need a special lookup to find the closing tag
             // without considering these possible HTML tag matches to be part of the final DOM
-            if (/SCRIPT/i.test(String(tagName))) {
+            if (/^SCRIPT$/i.test(String(tagName))) {
                 // try to find the closing tag
                 const possibleSimilarOnesNested: string[] = []
                 const exactTagPattern = new RegExp(

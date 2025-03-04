@@ -814,4 +814,17 @@ describe('parse', () => {
 			"type": "fragment"
 		})
 	});
+	
+	it('should parse noscript', () => {
+		const root = parse('<noscript><p>hello world</p></noscript>');
+		const root2 = parse('<noscript><p>hello world</p></noscript>', document);
+		
+		const res = `<noscript><p>hello world</p></noscript>`
+		
+		expect(stringifyNode(root)).toEqual(res);
+		expect(stringifyNode(root2)).toEqual(res);
+		
+		expect(root.children).toHaveLength(1)
+		expect(root.children[0].children).toHaveLength(1)
+	});
 })

@@ -9,6 +9,16 @@ import { selfClosingTags } from './self-closing-tags.ts'
 
 export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 
+// Pre-compiled regexes for better performance
+const HTML_PATTERN =
+    /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi
+const ATTR_PATTERN =
+    /([a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/gi
+const SVG_TEST = /svg/i
+const MATH_TEST = /math/i
+const HTML_TEST = /html/i
+const SCRIPT_TEST = /^SCRIPT$/i
+
 // URI based on https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS
 const NSURI: Record<string, string> = {
     HTML: 'http://www.w3.org/1999/xhtml',
@@ -16,23 +26,24 @@ const NSURI: Record<string, string> = {
     MATH: 'http://www.w3.org/1998/Math/MathML',
 }
 
+// Cache self-closing tags regex
+let selfClosingTagsRegex: RegExp
+
 const setAttributes = (node: Element | ElementLike, attributes: string) => {
-    attributes = attributes?.trim()
-    if (attributes) {
-        const attrPattern =
-            /([a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/gi
-        let match: RegExpExecArray | null = null
+    const trimmed = attributes?.trim()
+    if (!trimmed) return
 
-        while ((match = attrPattern.exec(attributes))) {
-            const name = match[1]
-            const value =
-                match[2] ||
-                match[3] ||
-                match[4] ||
-                (new RegExp(`^${match[1]}\\s*=`).test(match[0]) ? '' : null)
+    ATTR_PATTERN.lastIndex = 0
+    let match: RegExpExecArray | null
 
-            node.setAttribute(name, value ?? '')
-        }
+    while ((match = ATTR_PATTERN.exec(trimmed))) {
+        const name = match[1]
+        const value =
+            match[2] ??
+            match[3] ??
+            match[4] ??
+            (match[0].includes('=') ? '' : '')
+        node.setAttribute(name, value)
     }
 }
 
@@ -44,8 +55,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
     markup: string,
     handler: D | NodeHandlerCallback = Doc as D
 ): ParseReturn<D> => {
-    const pattern =
-        /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi
+    HTML_PATTERN.lastIndex = 0
     let match: RegExpExecArray | null = null
     const doc = (
         !handler || typeof handler === 'function' ? Doc : handler
@@ -57,8 +67,14 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
         doc.createDocumentFragment(),
     ]
     let lastIndex = 0
+    const markupLength = markup.length
 
-    while ((match = pattern.exec(markup)) !== null) {
+    // Cache self-closing tags regex
+    if (!selfClosingTagsRegex) {
+        selfClosingTagsRegex = selfClosingTags()
+    }
+
+    while ((match = HTML_PATTERN.exec(markup)) !== null) {
         const [
             ,
             comment,
@@ -69,11 +85,12 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
         ] = match
 
         if (bangOrClosingSlash === '!') {
-            lastIndex = pattern.lastIndex
+            lastIndex = HTML_PATTERN.lastIndex
             continue
         }
 
-        const stackLastItem = stack.at(-1)
+        const stackTop = stack.length - 1
+        const stackLastItem = stack[stackTop]
 
         // pre lingering text
         if (match.index >= lastIndex + 1) {
@@ -83,7 +100,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
             cb?.(node)
         }
 
-        lastIndex = pattern.lastIndex
+        lastIndex = HTML_PATTERN.lastIndex
 
         if (comment) {
             const node = doc.createComment(comment)
@@ -94,28 +111,29 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
 
         if (tagName) {
             if (bangOrClosingSlash) {
+                const stackTagName = stackLastItem?.tagName
                 if (
-                    new RegExp(tagName, 'i').test(stackLastItem?.tagName || '')
+                    stackTagName &&
+                    new RegExp(tagName, 'i').test(stackTagName)
                 ) {
                     stack.pop()
                 }
                 continue
             }
 
-            const ns = /svg/i.test(tagName)
+            const ns = SVG_TEST.test(tagName)
                 ? NSURI.SVG
-                : /math/i.test(tagName)
+                : MATH_TEST.test(tagName)
                 ? NSURI.MATH
-                : /html/i.test(tagName)
+                : HTML_TEST.test(tagName)
                 ? NSURI.HTML
                 : (stackLastItem as ElementLike)?.namespaceURI ?? NSURI.HTML
 
             const selfClosingTag =
-                selfClosingTags().test(tagName) || selfClosingSlash === '/'
+                selfClosingTagsRegex.test(tagName) || selfClosingSlash === '/'
 
             if (selfClosingTag) {
                 const node = doc.createElementNS(ns, tagName)
-
                 setAttributes(node, attributes)
                 stackLastItem?.appendChild(node)
                 cb?.(node)
@@ -124,13 +142,12 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
 
             const node = doc.createElementNS(ns, tagName)
             setAttributes(node, attributes)
-
             stackLastItem?.appendChild(node)
 
             // scripts in particular can have html strings that do not need to be rendered.
             // The overall markup therefore we need a special lookup to find the closing tag
             // without considering these possible HTML tag matches to be part of the final DOM
-            if (/^SCRIPT$/i.test(String(tagName))) {
+            if (SCRIPT_TEST.test(tagName)) {
                 // try to find the closing tag
                 const possibleSimilarOnesNested: string[] = []
                 const exactTagPattern = new RegExp(
@@ -155,7 +172,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
                                 node.appendChild(textNode)
                                 lastIndex =
                                     lastIndex + exactTagPattern.lastIndex
-                                pattern.lastIndex = lastIndex // move the pattern needle to start matching later in the string
+                                HTML_PATTERN.lastIndex = lastIndex // move the pattern needle to start matching later in the string
                                 break
                             } else {
                                 possibleSimilarOnesNested.pop()
@@ -175,7 +192,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
         }
     }
 
-    if (lastIndex < markup.length) {
+    if (lastIndex < markupLength) {
         const node = doc.createTextNode(markup.slice(lastIndex))
         stack[0].appendChild(node)
         cb?.(node)

@@ -5,19 +5,16 @@ import {
     NodeLike,
     DocumentFragmentLike,
 } from './Doc.ts'
-import { selfClosingTags } from './self-closing-tags.ts'
 
 export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 
+const SELF_CLOSING_TAGS =
+    /^(AREA|META|BASE|BR|COL|EMBED|HR|IMG|INPUT|LINK|PARAM|SOURCE|TRACK|WBR|COMMAND|KEYGEN|MENUITEM|DOCTYPE|!DOCTYPE)$/i
 // Pre-compiled regexes for better performance
 const HTML_PATTERN =
     /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi
 const ATTR_PATTERN =
     /([a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/gi
-const SVG_TEST = /svg/i
-const MATH_TEST = /math/i
-const HTML_TEST = /html/i
-const SCRIPT_TEST = /^SCRIPT$/i
 
 // URI based on https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS
 const NSURI: Record<string, string> = {
@@ -26,8 +23,35 @@ const NSURI: Record<string, string> = {
     MATH: 'http://www.w3.org/1998/Math/MathML',
 }
 
-// Cache self-closing tags regex
-let selfClosingTagsRegex: RegExp
+// Cache for tag regexes and namespaces
+const tagRegexCache = new Map<string, RegExp>()
+const namespaceCache = new Map<string, string>()
+
+const getTagRegex = (tagName: string): RegExp => {
+    let regex = tagRegexCache.get(tagName)
+    if (!regex) {
+        regex = new RegExp(tagName, 'i')
+        tagRegexCache.set(tagName, regex)
+    }
+    return regex
+}
+
+const getNamespace = (tagName: string, parentNS?: string): string => {
+    let ns = namespaceCache.get(tagName)
+    if (!ns) {
+        const lower = tagName.toLowerCase()
+        ns =
+            lower === 'svg'
+                ? NSURI.SVG
+                : lower.startsWith('math')
+                ? NSURI.MATH
+                : lower === 'html'
+                ? NSURI.HTML
+                : parentNS ?? NSURI.HTML
+        namespaceCache.set(tagName, ns)
+    }
+    return ns
+}
 
 const setAttributes = (node: Element | ElementLike, attributes: string) => {
     const trimmed = attributes?.trim()
@@ -38,11 +62,7 @@ const setAttributes = (node: Element | ElementLike, attributes: string) => {
 
     while ((match = ATTR_PATTERN.exec(trimmed))) {
         const name = match[1]
-        const value =
-            match[2] ??
-            match[3] ??
-            match[4] ??
-            (match[0].includes('=') ? '' : '')
+        const value = match[2] ?? match[3] ?? match[4] ?? ''
         node.setAttribute(name, value)
     }
 }
@@ -55,6 +75,18 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
     markup: string,
     handler: D | NodeHandlerCallback = Doc as D
 ): ParseReturn<D> => {
+    // Fast path for simple text-only content
+    if (!markup.includes('<')) {
+        const doc = (
+            !handler || typeof handler === 'function' ? Doc : handler
+        ) as DocumentLike
+        const fragment = doc.createDocumentFragment()
+        const textNode = doc.createTextNode(markup)
+        fragment.appendChild(textNode)
+        if (typeof handler === 'function') handler(textNode)
+        return fragment as ParseReturn<D>
+    }
+
     HTML_PATTERN.lastIndex = 0
     let match: RegExpExecArray | null = null
     const doc = (
@@ -63,16 +95,13 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
     const cb = (typeof handler === 'function'
         ? handler
         : null) as unknown as NodeHandlerCallback
-    const stack: Array<ElementLike | DocumentFragmentLike> = [
-        doc.createDocumentFragment(),
-    ]
+
+    // Pre-allocate stack with reasonable size
+    const stack: Array<ElementLike | DocumentFragmentLike> = new Array(32)
+    stack[0] = doc.createDocumentFragment()
+    let stackIndex = 0
     let lastIndex = 0
     const markupLength = markup.length
-
-    // Cache self-closing tags regex
-    if (!selfClosingTagsRegex) {
-        selfClosingTagsRegex = selfClosingTags()
-    }
 
     while ((match = HTML_PATTERN.exec(markup)) !== null) {
         const [
@@ -89,11 +118,10 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
             continue
         }
 
-        const stackTop = stack.length - 1
-        const stackLastItem = stack[stackTop]
+        const stackLastItem = stack[stackIndex]
 
-        // pre lingering text
-        if (match.index >= lastIndex + 1) {
+        // Pre-lingering text
+        if (match.index > lastIndex) {
             const text = markup.slice(lastIndex, match.index)
             const node = doc.createTextNode(text)
             stackLastItem?.appendChild(node)
@@ -112,46 +140,34 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
         if (tagName) {
             if (bangOrClosingSlash) {
                 const stackTagName = stackLastItem?.tagName
-                if (
-                    stackTagName &&
-                    new RegExp(tagName, 'i').test(stackTagName)
-                ) {
-                    stack.pop()
+                if (stackTagName && getTagRegex(tagName).test(stackTagName)) {
+                    stackIndex--
                 }
                 continue
             }
 
-            const ns = SVG_TEST.test(tagName)
-                ? NSURI.SVG
-                : MATH_TEST.test(tagName)
-                ? NSURI.MATH
-                : HTML_TEST.test(tagName)
-                ? NSURI.HTML
-                : (stackLastItem as ElementLike)?.namespaceURI ?? NSURI.HTML
-
-            const selfClosingTag =
-                selfClosingTagsRegex.test(tagName) || selfClosingSlash === '/'
-
-            if (selfClosingTag) {
-                const node = doc.createElementNS(ns, tagName)
-                setAttributes(node, attributes)
-                stackLastItem?.appendChild(node)
-                cb?.(node)
-                continue
-            }
+            const ns = getNamespace(
+                tagName,
+                (stackLastItem as ElementLike)?.namespaceURI
+            )
+            const isSelfClosing =
+                SELF_CLOSING_TAGS.test(tagName.toLowerCase()) ||
+                selfClosingSlash === '/'
 
             const node = doc.createElementNS(ns, tagName)
             setAttributes(node, attributes)
             stackLastItem?.appendChild(node)
 
-            // scripts in particular can have html strings that do not need to be rendered.
-            // The overall markup therefore we need a special lookup to find the closing tag
-            // without considering these possible HTML tag matches to be part of the final DOM
-            if (SCRIPT_TEST.test(tagName)) {
-                // try to find the closing tag
+            if (isSelfClosing) {
+                cb?.(node)
+                continue
+            }
+
+            // Handle script tags specially
+            if (tagName.toUpperCase() === 'SCRIPT') {
                 const possibleSimilarOnesNested: string[] = []
                 const exactTagPattern = new RegExp(
-                    `<(\\/)?(${tagName})\\s*([^>]*?)>`,
+                    `<(\\/)?(${tagName})\\s*([^>]*)>`,
                     'ig'
                 )
                 const markupAhead = markup.slice(lastIndex)
@@ -160,10 +176,9 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
                 while (
                     (tagMatch = exactTagPattern.exec(markupAhead)) !== null
                 ) {
-                    const [, closingSlash, name, , selfClosingSlash] = tagMatch
+                    const [, closingSlash, name] = tagMatch
 
-                    // check if the tag name is matched
-                    if (new RegExp(tagName, 'i').test(name)) {
+                    if (getTagRegex(tagName).test(name)) {
                         if (closingSlash) {
                             if (!possibleSimilarOnesNested.length) {
                                 const textNode = doc.createTextNode(
@@ -172,20 +187,18 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
                                 node.appendChild(textNode)
                                 lastIndex =
                                     lastIndex + exactTagPattern.lastIndex
-                                HTML_PATTERN.lastIndex = lastIndex // move the pattern needle to start matching later in the string
+                                HTML_PATTERN.lastIndex = lastIndex
                                 break
                             } else {
                                 possibleSimilarOnesNested.pop()
                             }
-                        } else if (!selfClosingSlash) {
-                            // could be that there is a script HTML string inside
-                            // we need to track those, so we don't mix them with the possible script closing tag
+                        } else {
                             possibleSimilarOnesNested.push(name)
                         }
                     }
                 }
             } else {
-                stack.push(node)
+                stack[++stackIndex] = node
             }
 
             cb?.(node)

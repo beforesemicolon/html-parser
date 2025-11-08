@@ -7,7 +7,9 @@ doc
 benchmark.js
 jest.config.js
 coverage
-.eslintrc.js
 .eslintignore
 .prettierignore
 .prettierrc
+.eslintrc.cjs
+jest.config.cjs
+.github

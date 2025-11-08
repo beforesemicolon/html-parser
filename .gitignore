@@ -3,3 +3,6 @@ dist
 node_modules
 **.tgz
 coverage
+.eslintrc.cjs
+jest.config.cjs
+.github

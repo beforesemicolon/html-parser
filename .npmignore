@@ -13,3 +13,7 @@ coverage
 .eslintrc.cjs
 jest.config.cjs
 .github
+renovate.json
+.renovaterc.json
+.renovaterc
+renovate.json5

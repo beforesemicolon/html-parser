@@ -1,68 +1,189 @@
-import {
-    Doc,
+import { Doc } from './Doc.ts'
+import type {
+    DocumentFragmentLike,
     DocumentLike,
     ElementLike,
     NodeLike,
-    DocumentFragmentLike,
 } from './Doc.ts'
 
 export type NodeHandlerCallback = (node: ElementLike | NodeLike) => void
 
-const SELF_CLOSING_TAGS =
-    /^(AREA|META|BASE|BR|COL|EMBED|HR|IMG|INPUT|LINK|PARAM|SOURCE|TRACK|WBR|COMMAND|KEYGEN|MENUITEM|DOCTYPE|!DOCTYPE)$/i
-// Pre-compiled regexes for better performance
-const HTML_PATTERN =
-    /<!--([^]*?(?=-->))-->|<(\/|!)?([a-z][a-z0-9-]*)\s*([^>]*?)(\/?)>/gi
-const ATTR_PATTERN =
-    /([a-z][\w-.:]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/gi
+const HTML_NS = 'http://www.w3.org/1999/xhtml'
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const MATH_NS = 'http://www.w3.org/1998/Math/MathML'
 
-// URI based on https://developer.mozilla.org/en-US/docs/Web/API/Document/createElementNS
-const NSURI: Record<string, string> = {
-    HTML: 'http://www.w3.org/1999/xhtml',
-    SVG: 'http://www.w3.org/2000/svg',
-    MATH: 'http://www.w3.org/1998/Math/MathML',
-}
+const VOID_TAGS = new Set([
+    'AREA',
+    'BASE',
+    'BR',
+    'COL',
+    'COMMAND',
+    'EMBED',
+    'HR',
+    'IMG',
+    'INPUT',
+    'KEYGEN',
+    'LINK',
+    'MENUITEM',
+    'META',
+    'PARAM',
+    'SOURCE',
+    'TRACK',
+    'WBR',
+])
 
-// Cache for tag regexes and namespaces
-const tagRegexCache = new Map<string, RegExp>()
-const namespaceCache = new Map<string, string>()
+const RAW_TEXT_TAGS = new Set(['STYLE', 'TEXTAREA', 'TITLE'])
 
-const getTagRegex = (tagName: string): RegExp => {
-    let regex = tagRegexCache.get(tagName)
-    if (!regex) {
-        regex = new RegExp(tagName, 'i')
-        tagRegexCache.set(tagName, regex)
+const isWhitespace = (code: number) =>
+    code === 9 || code === 10 || code === 12 || code === 13 || code === 32
+
+const isAsciiLetter = (code: number) =>
+    (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+
+const isTagNameCharacter = (code: number) =>
+    isAsciiLetter(code) || (code >= 48 && code <= 57) || code === 45
+
+const isTagBoundary = (code: number) =>
+    !code || isWhitespace(code) || code === 47 || code === 62
+
+const findTagEnd = (markup: string, start: number) => {
+    let quote = 0
+
+    for (let i = start; i < markup.length; i++) {
+        const code = markup.charCodeAt(i)
+
+        if (quote) {
+            if (code === quote) quote = 0
+        } else if (code === 34 || code === 39) {
+            quote = code
+        } else if (code === 62) {
+            return i
+        }
     }
-    return regex
+
+    return -1
 }
 
-const getNamespace = (tagName: string, parentNS?: string): string => {
-    let ns = namespaceCache.get(tagName)
-    if (!ns) {
-        const lower = tagName.toLowerCase()
-        ns =
-            lower === 'svg'
-                ? NSURI.SVG
-                : lower.startsWith('math')
-                ? NSURI.MATH
-                : lower === 'html'
-                ? NSURI.HTML
-                : parentNS ?? NSURI.HTML
-        namespaceCache.set(tagName, ns)
+const matchesTagAt = (markup: string, index: number, tagName: string) => {
+    if (index + tagName.length > markup.length) return false
+
+    for (let i = 0; i < tagName.length; i++) {
+        const actual = markup.charCodeAt(index + i)
+        const expected = tagName.charCodeAt(i)
+        if (actual !== expected && actual !== expected + 32) return false
     }
-    return ns
+
+    return isTagBoundary(markup.charCodeAt(index + tagName.length))
 }
 
-const setAttributes = (node: Element | ElementLike, attributes: string) => {
-    const trimmed = attributes?.trim()
-    if (!trimmed) return
+const findRawTextEnd = (
+    markup: string,
+    start: number,
+    tagName: string,
+    balanced = false
+) => {
+    let searchIndex = start
+    let depth = 0
 
-    ATTR_PATTERN.lastIndex = 0
-    let match: RegExpExecArray | null
+    while (searchIndex < markup.length) {
+        const tagStart = markup.indexOf('<', searchIndex)
+        if (tagStart < 0) return null
 
-    while ((match = ATTR_PATTERN.exec(trimmed))) {
-        const name = match[1]
-        const value = match[2] ?? match[3] ?? match[4] ?? ''
+        const closing = markup.charCodeAt(tagStart + 1) === 47
+        const nameStart = tagStart + (closing ? 2 : 1)
+
+        if (matchesTagAt(markup, nameStart, tagName)) {
+            const tagEnd = findTagEnd(markup, nameStart + tagName.length)
+            if (tagEnd < 0) return null
+
+            if (closing) {
+                if (depth === 0) {
+                    return { contentEnd: tagStart, tagEnd: tagEnd + 1 }
+                }
+                depth--
+            } else if (balanced) {
+                depth++
+            }
+
+            searchIndex = tagEnd + 1
+        } else {
+            searchIndex = tagStart + 1
+        }
+    }
+
+    return null
+}
+
+const getNamespace = (
+    tagName: string,
+    parent?: ElementLike | DocumentFragmentLike
+) => {
+    if (tagName === 'SVG') return SVG_NS
+    if (tagName === 'MATH') return MATH_NS
+    if (tagName === 'HTML') return HTML_NS
+
+    const parentElement = parent as ElementLike
+    if (
+        parentElement?.namespaceURI === SVG_NS &&
+        parentElement.tagName?.toUpperCase() === 'FOREIGNOBJECT'
+    ) {
+        return HTML_NS
+    }
+
+    return parentElement?.namespaceURI ?? HTML_NS
+}
+
+const setAttributes = (
+    node: Element | ElementLike,
+    markup: string,
+    start: number,
+    end: number
+) => {
+    let i = start
+
+    while (i < end) {
+        while (i < end && isWhitespace(markup.charCodeAt(i))) i++
+        if (i >= end || markup.charCodeAt(i) === 47) break
+
+        const nameStart = i
+        while (i < end) {
+            const code = markup.charCodeAt(i)
+            if (isWhitespace(code) || code === 61 || code === 47) break
+            i++
+        }
+
+        if (nameStart === i) {
+            i++
+            continue
+        }
+
+        const name = markup.slice(nameStart, i)
+        while (i < end && isWhitespace(markup.charCodeAt(i))) i++
+
+        let value = ''
+        if (markup.charCodeAt(i) === 61) {
+            i++
+            while (i < end && isWhitespace(markup.charCodeAt(i))) i++
+
+            const quote = markup.charCodeAt(i)
+            if (quote === 34 || quote === 39) {
+                const valueStart = ++i
+                while (i < end && markup.charCodeAt(i) !== quote) i++
+                value = markup.slice(valueStart, i)
+                if (i < end) i++
+            } else {
+                const valueStart = i
+                while (i < end) {
+                    const code = markup.charCodeAt(i)
+                    if (isWhitespace(code) || (code === 47 && i + 1 === end)) {
+                        break
+                    }
+                    i++
+                }
+                value = markup.slice(valueStart, i)
+            }
+        }
+
         node.setAttribute(name, value)
     }
 }
@@ -75,141 +196,153 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
     markup: string,
     handler: D | NodeHandlerCallback = Doc as D
 ): ParseReturn<D> => {
-    // Fast path for simple text-only content
-    if (!markup.includes('<')) {
-        const doc = (
-            !handler || typeof handler === 'function' ? Doc : handler
-        ) as DocumentLike
-        const fragment = doc.createDocumentFragment()
-        const textNode = doc.createTextNode(markup)
-        fragment.appendChild(textNode)
-        if (typeof handler === 'function') handler(textNode)
-        return fragment as ParseReturn<D>
-    }
-
-    HTML_PATTERN.lastIndex = 0
-    let match: RegExpExecArray | null = null
     const doc = (
         !handler || typeof handler === 'function' ? Doc : handler
     ) as DocumentLike
-    const cb = (typeof handler === 'function'
-        ? handler
-        : null) as unknown as NodeHandlerCallback
+    const cb =
+        typeof handler === 'function' ? (handler as NodeHandlerCallback) : null
+    const root = doc.createDocumentFragment()
 
-    // Pre-allocate stack with reasonable size
-    const stack: Array<ElementLike | DocumentFragmentLike> = new Array(32)
-    stack[0] = doc.createDocumentFragment()
-    let stackIndex = 0
-    let lastIndex = 0
-    const markupLength = markup.length
+    const appendText = (
+        parent: ElementLike | DocumentFragmentLike,
+        start: number,
+        end: number,
+        notify = true
+    ) => {
+        if (end <= start) return
+        const node = doc.createTextNode(markup.slice(start, end))
+        parent.appendChild(node)
+        if (notify) cb?.(node)
+    }
 
-    while ((match = HTML_PATTERN.exec(markup)) !== null) {
-        const [
-            ,
-            comment,
-            bangOrClosingSlash,
-            tagName,
-            attributes,
-            selfClosingSlash,
-        ] = match
+    if (!markup.includes('<')) {
+        appendText(root, 0, markup.length)
+        return root as ParseReturn<D>
+    }
 
-        if (bangOrClosingSlash === '!') {
-            lastIndex = HTML_PATTERN.lastIndex
-            continue
+    const stack: Array<ElementLike | DocumentFragmentLike> = [root]
+    let i = 0
+
+    while (i < markup.length) {
+        const parent = stack[stack.length - 1]
+        const tagStart = markup.indexOf('<', i)
+
+        if (tagStart < 0) {
+            appendText(parent, i, markup.length)
+            break
         }
 
-        const stackLastItem = stack[stackIndex]
-
-        // Pre-lingering text
-        if (match.index > lastIndex) {
-            const text = markup.slice(lastIndex, match.index)
-            const node = doc.createTextNode(text)
-            stackLastItem?.appendChild(node)
-            cb?.(node)
-        }
-
-        lastIndex = HTML_PATTERN.lastIndex
-
-        if (comment) {
-            const node = doc.createComment(comment)
-            stackLastItem?.appendChild(node)
-            cb?.(node)
-            continue
-        }
-
-        if (tagName) {
-            if (bangOrClosingSlash) {
-                const stackTagName = stackLastItem?.tagName
-                if (stackTagName && getTagRegex(tagName).test(stackTagName)) {
-                    stackIndex--
-                }
-                continue
+        if (markup.startsWith('<!--', tagStart)) {
+            appendText(parent, i, tagStart)
+            const commentEnd = markup.indexOf('-->', tagStart + 4)
+            if (commentEnd < 0) {
+                appendText(parent, tagStart, markup.length)
+                break
             }
 
-            const ns = getNamespace(
-                tagName,
-                (stackLastItem as ElementLike)?.namespaceURI
+            const node = doc.createComment(
+                markup.slice(tagStart + 4, commentEnd)
             )
-            const isSelfClosing =
-                SELF_CLOSING_TAGS.test(tagName.toLowerCase()) ||
-                selfClosingSlash === '/'
+            parent.appendChild(node)
+            cb?.(node)
+            i = commentEnd + 3
+            continue
+        }
 
-            const node = doc.createElementNS(ns, tagName)
-            setAttributes(node, attributes)
-            stackLastItem?.appendChild(node)
+        const nextCode = markup.charCodeAt(tagStart + 1)
+        if (nextCode === 33 || nextCode === 63) {
+            const tagEnd = findTagEnd(markup, tagStart + 2)
+            if (tagEnd < 0) {
+                appendText(parent, tagStart, markup.length)
+                break
+            }
+            i = tagEnd + 1
+            continue
+        }
 
-            if (isSelfClosing) {
+        const closing = nextCode === 47
+        const nameStart = tagStart + (closing ? 2 : 1)
+        if (!isAsciiLetter(markup.charCodeAt(nameStart))) {
+            appendText(parent, i, tagStart + 1)
+            i = tagStart + 1
+            continue
+        }
+
+        appendText(parent, i, tagStart)
+
+        let nameEnd = nameStart + 1
+        while (
+            nameEnd < markup.length &&
+            isTagNameCharacter(markup.charCodeAt(nameEnd))
+        ) {
+            nameEnd++
+        }
+
+        const tagEnd = findTagEnd(markup, nameEnd)
+        if (tagEnd < 0) {
+            appendText(parent, tagStart, markup.length)
+            break
+        }
+
+        const sourceTagName = markup.slice(nameStart, nameEnd)
+        const tagName = sourceTagName.toUpperCase()
+
+        if (closing) {
+            for (
+                let stackIndex = stack.length - 1;
+                stackIndex > 0;
+                stackIndex--
+            ) {
+                const candidate = stack[stackIndex] as ElementLike
+                if (candidate.tagName?.toUpperCase() === tagName) {
+                    stack.length = stackIndex
+                    break
+                }
+            }
+            i = tagEnd + 1
+            continue
+        }
+
+        let slashIndex = tagEnd - 1
+        while (
+            slashIndex > nameEnd &&
+            isWhitespace(markup.charCodeAt(slashIndex))
+        ) {
+            slashIndex--
+        }
+        const explicitlyClosed = markup.charCodeAt(slashIndex) === 47
+        const attributeEnd = explicitlyClosed ? slashIndex : tagEnd
+        const node = doc.createElementNS(
+            getNamespace(tagName, parent),
+            sourceTagName
+        )
+        setAttributes(node, markup, nameEnd, attributeEnd)
+        parent.appendChild(node)
+
+        i = tagEnd + 1
+        if (explicitlyClosed || VOID_TAGS.has(tagName)) {
+            cb?.(node)
+            continue
+        }
+
+        if (tagName === 'SCRIPT' || RAW_TEXT_TAGS.has(tagName)) {
+            const rawEnd = findRawTextEnd(
+                markup,
+                i,
+                tagName,
+                tagName === 'SCRIPT'
+            )
+            if (rawEnd) {
+                appendText(node, i, rawEnd.contentEnd, tagName !== 'SCRIPT')
+                i = rawEnd.tagEnd
                 cb?.(node)
                 continue
             }
-
-            // Handle script tags specially
-            if (tagName.toUpperCase() === 'SCRIPT') {
-                const possibleSimilarOnesNested: string[] = []
-                const exactTagPattern = new RegExp(
-                    `<(\\/)?(${tagName})\\s*([^>]*)>`,
-                    'ig'
-                )
-                const markupAhead = markup.slice(lastIndex)
-                let tagMatch: RegExpExecArray | null = null
-
-                while (
-                    (tagMatch = exactTagPattern.exec(markupAhead)) !== null
-                ) {
-                    const [, closingSlash, name] = tagMatch
-
-                    if (getTagRegex(tagName).test(name)) {
-                        if (closingSlash) {
-                            if (!possibleSimilarOnesNested.length) {
-                                const textNode = doc.createTextNode(
-                                    markupAhead.slice(0, tagMatch.index)
-                                )
-                                node.appendChild(textNode)
-                                lastIndex =
-                                    lastIndex + exactTagPattern.lastIndex
-                                HTML_PATTERN.lastIndex = lastIndex
-                                break
-                            } else {
-                                possibleSimilarOnesNested.pop()
-                            }
-                        } else {
-                            possibleSimilarOnesNested.push(name)
-                        }
-                    }
-                }
-            } else {
-                stack[++stackIndex] = node
-            }
-
-            cb?.(node)
         }
-    }
 
-    if (lastIndex < markupLength) {
-        const node = doc.createTextNode(markup.slice(lastIndex))
-        stack[0].appendChild(node)
+        stack.push(node)
         cb?.(node)
     }
 
-    return stack[0] as ParseReturn<D>
+    return root as ParseReturn<D>
 }

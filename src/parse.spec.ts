@@ -827,4 +827,52 @@ describe('parse', () => {
 		expect(root.children).toHaveLength(1)
 		expect(root.children[0].children).toHaveLength(1)
 	});
+
+	describe('parser edge cases', () => {
+		it('keeps trailing text inside an unclosed element', () => {
+			const root = parse('<div>tail');
+
+			expect(stringifyNode(root)).toBe('<div>tail</div>');
+		});
+
+		it('closes the matching ancestor for mismatched closing tags', () => {
+			const root = parse('<div><span>x</div><p>y</p>');
+
+			expect(stringifyNode(root)).toBe('<div><span>x</span></div><p>y</p>');
+		});
+
+		it('allows angle brackets inside quoted attribute values', () => {
+			const root = parse('<div title="1 > 0">ok</div>');
+			const root2 = parse('<div title="1 > 0">ok</div>', document);
+
+			expect(root.children[0].attributes.getNamedItem('title')?.value).toBe('1 > 0');
+			expect(root2.children[0].attributes.getNamedItem('title')?.value).toBe('1 > 0');
+		});
+
+		it('keeps markup-like content inside style as text', () => {
+			const root = parse('<style>.x::before{content:"<b>"}</style>');
+
+			expect(root.children[0].children).toHaveLength(0);
+			expect(root.children[0].textContent).toBe('.x::before{content:"<b>"}');
+		});
+
+		it('derives namespaces from the current parent', () => {
+			const root = parse('<title>html</title><svg><title>svg</title></svg>');
+
+			expect(root.children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+			expect(root.children[1].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+		});
+
+		it('is reentrant when a callback starts another parse', () => {
+			let nested = false;
+			const root = parse('<div><span>x</span><i>y</i></div>', () => {
+				if (!nested) {
+					nested = true;
+					parse('<b>nested</b>');
+				}
+			});
+
+			expect(stringifyNode(root)).toBe('<div><span>x</span><i>y</i></div>');
+		});
+	});
 })

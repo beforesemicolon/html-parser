@@ -1,2 +1,4 @@
-export const selfClosingTags = () =>
+const SELF_CLOSING_TAGS =
     /^(AREA|META|BASE|BR|COL|EMBED|HR|IMG|INPUT|LINK|PARAM|SOURCE|TRACK|WBR|COMMAND|KEYGEN|MENUITEM|DOCTYPE|!DOCTYPE)$/i
+
+export const selfClosingTags = () => SELF_CLOSING_TAGS

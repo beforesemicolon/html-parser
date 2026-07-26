@@ -5,6 +5,8 @@ tsconfig.json
 doc
 **.tgz
 benchmark.js
+benchmark.compare.mjs
+build.js
 jest.config.js
 coverage
 .eslintignore

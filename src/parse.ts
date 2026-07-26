@@ -43,8 +43,55 @@ const isAsciiLetter = (code: number) =>
 const isTagNameCharacter = (code: number) =>
     isAsciiLetter(code) || (code >= 48 && code <= 57) || code === 45
 
+const LEGACY_ATTRIBUTE_PLACEHOLDER = /^\$val[0-9]+["']?$/
+
 const isTagBoundary = (code: number) =>
     !code || isWhitespace(code) || code === 47 || code === 62
+
+const tagNamesEqual = (actual: string | undefined, expected: string) => {
+    if (!actual || actual.length !== expected.length) return false
+    if (actual === expected) return true
+
+    for (let index = 0; index < expected.length; index++) {
+        const actualCode = actual.charCodeAt(index)
+        const expectedCode = expected.charCodeAt(index)
+        if (actualCode !== expectedCode && actualCode !== expectedCode + 32) {
+            return false
+        }
+    }
+
+    return true
+}
+
+const isLegacyPlaceholderQuote = (
+    markup: string,
+    start: number,
+    quoteIndex: number
+) => {
+    let index = quoteIndex - 1
+
+    if (index < start || markup.charCodeAt(index) < 48) return false
+    if (markup.charCodeAt(index) > 57) return false
+
+    while (
+        index >= start &&
+        markup.charCodeAt(index) >= 48 &&
+        markup.charCodeAt(index) <= 57
+    ) {
+        index--
+    }
+
+    const dollarIndex = index - 3
+    return (
+        dollarIndex >= start &&
+        markup.charCodeAt(dollarIndex) === 36 &&
+        markup.charCodeAt(index - 2) === 118 &&
+        markup.charCodeAt(index - 1) === 97 &&
+        markup.charCodeAt(index) === 108 &&
+        (dollarIndex === start ||
+            isWhitespace(markup.charCodeAt(dollarIndex - 1)))
+    )
+}
 
 const findTagEnd = (markup: string, start: number) => {
     let quote = 0
@@ -54,7 +101,10 @@ const findTagEnd = (markup: string, start: number) => {
 
         if (quote) {
             if (code === quote) quote = 0
-        } else if (code === 34 || code === 39) {
+        } else if (
+            (code === 34 || code === 39) &&
+            !isLegacyPlaceholderQuote(markup, start, i)
+        ) {
             quote = code
         } else if (code === 62) {
             return i
@@ -125,7 +175,7 @@ const getNamespace = (
     const parentElement = parent as ElementLike
     if (
         parentElement?.namespaceURI === SVG_NS &&
-        parentElement.tagName?.toUpperCase() === 'FOREIGNOBJECT'
+        tagNamesEqual(parentElement.tagName, 'FOREIGNOBJECT')
     ) {
         return HTML_NS
     }
@@ -157,7 +207,19 @@ const setAttributes = (
             continue
         }
 
-        const name = markup.slice(nameStart, i)
+        const sourceName = markup.slice(nameStart, i)
+        const isLegacyPlaceholder =
+            sourceName.charCodeAt(0) === 36 &&
+            LEGACY_ATTRIBUTE_PLACEHOLDER.test(sourceName)
+        const sourceNameEnd = sourceName.charCodeAt(sourceName.length - 1)
+        const name = isLegacyPlaceholder
+            ? sourceName.slice(
+                  1,
+                  sourceNameEnd === 34 || sourceNameEnd === 39
+                      ? sourceName.length - 1
+                      : sourceName.length
+              )
+            : sourceName
         while (i < end && isWhitespace(markup.charCodeAt(i))) i++
 
         let value = ''
@@ -251,6 +313,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
 
         const nextCode = markup.charCodeAt(tagStart + 1)
         if (nextCode === 33 || nextCode === 63) {
+            appendText(parent, i, tagStart)
             const tagEnd = findTagEnd(markup, tagStart + 2)
             if (tagEnd < 0) {
                 appendText(parent, tagStart, markup.length)
@@ -294,7 +357,7 @@ export const parse = <D extends Partial<DocumentLike | Document>>(
                 stackIndex--
             ) {
                 const candidate = stack[stackIndex] as ElementLike
-                if (candidate.tagName?.toUpperCase() === tagName) {
+                if (tagNamesEqual(candidate.tagName, tagName)) {
                     stack.length = stackIndex
                     break
                 }

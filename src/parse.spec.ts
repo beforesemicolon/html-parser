@@ -47,6 +47,7 @@ describe('parse', () => {
 		const root2 = parse(basicPageMarkup, document);
 
 		const res = `
+
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -584,7 +585,7 @@ describe('parse', () => {
 		const nodeCallback = jest.fn();
 		const root = parse(basicPageMarkup, nodeCallback);
 
-		expect(nodeCallback).toHaveBeenCalledTimes(27)
+		expect(nodeCallback).toHaveBeenCalledTimes(28)
 		expect(nodeCallback).toHaveBeenCalledWith(root.children[0])
 	});
 
@@ -626,6 +627,10 @@ describe('parse', () => {
 		expect(root).toEqual({
 			"appendChild": expect.any(Function),
 			"children": [
+				{
+					"type": "text",
+					"value": "\n"
+				},
 				{
 					"type": "text",
 					"value": "\n"
@@ -849,18 +854,74 @@ describe('parse', () => {
 			expect(root2.children[0].attributes.getNamedItem('title')?.value).toBe('1 > 0');
 		});
 
+		it('normalizes legacy attribute placeholders without changing other names', () => {
+			const root = parse('<button $val0 $name></button>');
+			const root2 = parse('<button $val0></button>', document);
+
+			expect(root.children[0].attributes.getNamedItem('val0')?.value).toBe('');
+			expect(root.children[0].attributes.getNamedItem('$name')?.value).toBe('');
+			expect(root2.children[0].attributes.getNamedItem('val0')?.value).toBe('');
+		});
+
+		it('recovers a quoted legacy boolean placeholder used by Markup', () => {
+			const markup = '<input type="text" $val0"></input>';
+			const root = parse(markup);
+			const root2 = parse(markup, document);
+
+			expect(root.children).toHaveLength(1);
+			expect(root2.children).toHaveLength(1);
+			expect(root.children[0].attributes.getNamedItem('val0')?.value).toBe('');
+			expect(root2.children[0].attributes.getNamedItem('val0')?.value).toBe('');
+			expect(root.children[0].attributes.getNamedItem('type')?.value).toBe('text');
+			expect(root2.children[0].attributes.getNamedItem('type')?.value).toBe('text');
+		});
+
+		it('preserves text around ignored declarations and processing instructions', () => {
+			const markup = '<div>before<!doctype html>middle<?xml version="1.0"?>after</div>';
+			const root = parse(markup);
+			const root2 = parse(markup, document);
+
+			expect(stringifyNode(root)).toBe('<div>beforemiddleafter</div>');
+			expect(stringifyNode(root2)).toBe('<div>beforemiddleafter</div>');
+		});
+
+		it('preserves an unterminated declaration as text', () => {
+			const root = parse('<div>before<!unfinished');
+			const root2 = parse('<div>before<!unfinished', document);
+
+			expect(stringifyNode(root)).toBe('<div>before<!unfinished</div>');
+			expect(stringifyNode(root2)).toBe('<div>before&lt;!unfinished</div>');
+		});
+
 		it('keeps markup-like content inside style as text', () => {
-			const root = parse('<style>.x::before{content:"<b>"}</style>');
+			const markup = '<style>.x::before{content:"<b>"}</style>';
+			const root = parse(markup);
+			const root2 = parse(markup, document);
 
 			expect(root.children[0].children).toHaveLength(0);
+			expect(root2.children[0].children).toHaveLength(0);
 			expect(root.children[0].textContent).toBe('.x::before{content:"<b>"}');
+			expect(root2.children[0].textContent).toBe('.x::before{content:"<b>"}');
 		});
 
 		it('derives namespaces from the current parent', () => {
-			const root = parse('<title>html</title><svg><title>svg</title></svg>');
+			const markup =
+				'<title>html</title>' +
+				'<svg><title>svg</title><foreignObject><div>html</div></foreignObject></svg>' +
+				'<math><mi>x</mi></math>';
+			const root = parse(markup);
+			const root2 = parse(markup, document);
 
 			expect(root.children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+			expect(root2.children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
 			expect(root.children[1].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			expect(root2.children[1].children[0].namespaceURI).toBe('http://www.w3.org/2000/svg');
+			expect(root.children[1].children[1].children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+			expect(root2.children[1].children[1].children[0].namespaceURI).toBe('http://www.w3.org/1999/xhtml');
+			expect(root.children[2].namespaceURI).toBe('http://www.w3.org/1998/Math/MathML');
+			expect(root2.children[2].namespaceURI).toBe('http://www.w3.org/1998/Math/MathML');
+			expect(root.children[2].children[0].namespaceURI).toBe('http://www.w3.org/1998/Math/MathML');
+			expect(root2.children[2].children[0].namespaceURI).toBe('http://www.w3.org/1998/Math/MathML');
 		});
 
 		it('is reentrant when a callback starts another parse', () => {

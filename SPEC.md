@@ -165,6 +165,14 @@ element.setAttribute(name, value)
 A boolean attribute has an empty-string value. Attribute names retain their
 source spelling. Attribute values are not entity-decoded.
 
+The compatibility exceptions are boolean attributes matching `$val[0-9]+` and
+that same placeholder followed by one stray quote. They are reported without
+the leading `$` or trailing quote (for example, `$val0` and `$val0"` are both
+reported as `val0`). The previous parser produced this result and
+`@beforesemicolon/markup` relies on it for dynamic attribute placeholders.
+Other names beginning with `$` retain the `$`, and quotes on other malformed
+attributes retain the recovery behavior described below.
+
 A `/` immediately before the closing `>` marks an explicitly self-closing
 element and is not part of an unquoted attribute value.
 
@@ -309,6 +317,8 @@ Before merge:
    - trailing text inside an unclosed element;
    - mismatched closing-tag recovery;
    - `>` inside quoted attributes;
+   - legacy `$val[0-9]+` attribute-placeholder compatibility;
+   - text around ignored and unterminated declarations;
    - markup-looking text inside `style`;
    - identical tag names in HTML and SVG namespaces; and
    - recursive `parse()` calls from callbacks.
@@ -317,8 +327,8 @@ Before merge:
 4. TypeScript and lint checks pass.
 5. No parser state leaks between calls.
 
-The implementation accompanying this specification passes 42 tests: the
-original 36 plus six regression tests.
+The implementation accompanying this specification passes 46 tests: the
+original 36 plus ten regression tests.
 
 ## 18. Performance specification
 
@@ -333,13 +343,23 @@ The comparison must:
 
 - use the exact pre-change implementation as the baseline;
 - feed identical markup and handlers to both implementations;
-- include small, attribute-heavy, medium, large, script-heavy, SVG-heavy, and
-  malformed inputs;
+- include small, attribute-heavy, Markup-template, medium, large,
+  script-heavy, SVG-heavy, and malformed inputs;
+- build the baseline from `BENCHMARK_BASE_REF` (defaulting to
+  `origin/master`) and the candidate from the current working tree with
+  identical production module-build settings;
+- execute the generated minified ESM module trees while measuring a separate
+  identical single-file bundle for the size comparison;
+- run every mode/workload pair in a fresh Node.js process so JIT history from
+  one workload cannot influence another;
 - warm both implementations before measurement;
+- calibrate identical iteration counts to a target sample duration;
 - alternate measurement order to reduce ordering bias;
-- collect seven timed samples;
-- compare sample medians;
-- report milliseconds per parse and throughput;
+- collect 15 paired timed samples;
+- compare paired sample medians and report a bootstrapped 95% confidence
+  interval;
+- report milliseconds per parse, throughput, statistical confidence, and
+  practical materiality;
 - report per-case percentage changes and a geometric-mean change; and
 - disclose runtime, bundle-size, and methodology tradeoffs.
 
@@ -349,31 +369,41 @@ The reproducible benchmark command is:
 node --expose-gc benchmark.compare.mjs
 ```
 
-The measured Node.js 24 results for the accompanying implementation are:
+The command materializes and bundles both implementations in a temporary
+directory; no manually prepared `/tmp` modules are required. Environment
+variables can select cases or modes, change the base ref, adjust sample count
+or duration, and write the complete samples to JSON.
+
+Two independent full runs on Node.js 24 for macOS/arm64 produced these median
+change ranges:
 
 | Workload | Tokenizer change | Default `Doc` change |
 |---|---:|---:|
-| Small HTML | +31.7% | +8.2% |
-| Attributes | +18.3% | +4.5% |
-| Medium HTML | +36.9% | +0.8% |
-| Large HTML | +32.8% | +12.4% |
-| Script-heavy | +161.4% | +18.5% |
-| SVG-heavy | +3.9% | +4.3% |
-| Malformed HTML | +61.5% | +5.9% |
-| **Geometric mean** | **+43.3%** | **+7.7%** |
+| Small HTML | −9.4% to −8.7% | +15.1% to +16.1% |
+| Attributes | +8.4% to +9.3% | +18.7% to +22.2% |
+| Markup template | +1.6% to +2.5% | +21.7% to +22.0% |
+| Medium HTML | +14.0% to +15.4% | +21.0% to +26.7% |
+| Large HTML | +13.4% to +14.0% | +26.9% to +29.6% |
+| Script-heavy | +93.4% to +102.7% | +90.0% to +90.5% |
+| SVG-heavy | +3.7% to +7.2% | +6.2% to +16.2% |
+| Malformed HTML | +27.8% to +33.2% | +15.6% to +22.9% |
+| **Geometric mean** | **+16.3% to +18.3%** | **+26.8% to +27.3%** |
 
-Positive percentages indicate faster execution. Default `Doc` improvements are
-smaller because output-node allocation and DOM-like bookkeeping account for a
-larger portion of end-to-end time.
+Positive percentages indicate faster execution. The small tokenizer-only
+regression is approximately 0.00007 milliseconds per parse, below the
+benchmark's default practical materiality threshold of 0.001 milliseconds.
+The default `Doc` path improves for every workload in both independent runs.
 
-The optimized bundle measured 13,715 bytes versus 11,212 bytes for the
-baseline, an increase of 22.3%. This size cost is an explicit tradeoff for the
-correctness fixes and scanner implementation and must remain visible during
-review.
+With identical minified, bundled, keep-name esbuild settings, the candidate
+measured 6,414 bytes versus 4,626 bytes for the baseline: an increase of 1,788
+bytes or 38.7%. This size cost is an explicit tradeoff for the correctness
+fixes and scanner implementation and must remain visible during review.
 
 ## 19. Performance acceptance criteria
 
-For this change:
+For this change, a regression is considered materially repeatable when its
+paired 95% confidence interval excludes zero and its median effect is at least
+3% and 0.001 milliseconds per parse. Under that definition:
 
 - no benchmark workload may show a material repeatable regression;
 - tokenizer geometric-mean performance must improve;

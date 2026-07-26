@@ -103,7 +103,13 @@ class NamedNodeMap implements NamedNodeMapLike {
     }
 
     item(index: number) {
-        return Array.from(this.#attributes.values())[index] || null
+        if (index < 0 || index >= this.#attributes.size) return null
+
+        let current = 0
+        for (const attribute of this.#attributes.values()) {
+            if (current++ === index) return attribute
+        }
+        return null
     }
 
     getNamedItem(name: string) {
@@ -116,8 +122,9 @@ class NamedNodeMap implements NamedNodeMapLike {
     }
 
     removeNamedItem(name: string) {
+        const attribute = this.getNamedItem(name)
         this.#attributes.delete(name)
-        return this.getNamedItem(name) || null
+        return attribute
     }
 
     [Symbol.iterator]() {
@@ -127,8 +134,8 @@ class NamedNodeMap implements NamedNodeMapLike {
 
 class Element extends Node implements ElementLike {
     #tag = ''
-    #children: Set<ElementLike> = new Set()
-    #nodes: Set<NodeLike | ElementLike> = new Set()
+    #children: ElementLike[] = []
+    #nodes: Array<NodeLike | ElementLike> = []
     #attributes = new NamedNodeMap()
     #ns: string
 
@@ -149,11 +156,11 @@ class Element extends Node implements ElementLike {
     }
 
     get childNodes() {
-        return Array.from(this.#nodes.values())
+        return this.#nodes
     }
 
     get children() {
-        return Array.from(this.#children.values())
+        return this.#children
     }
 
     get attributes() {
@@ -161,8 +168,8 @@ class Element extends Node implements ElementLike {
     }
 
     get textContent() {
-        return this.#nodes.size
-            ? Array.from(this.#nodes.values())
+        return this.#nodes.length
+            ? this.#nodes
                   .map((n) => {
                       if (n.nodeType === 8) {
                           return ''
@@ -185,7 +192,7 @@ class Element extends Node implements ElementLike {
         const hasAttrs = this.#attributes.length
         if (hasAttrs) {
             str += ' '
-            str += Array.from(this.#attributes)
+            str += [...this.#attributes]
                 .map(({ name, value }) => `${name}="${value}"`)
                 .join(' ')
         }
@@ -193,8 +200,8 @@ class Element extends Node implements ElementLike {
         str += '>'
 
         if (!selfClosingTags().test(tag)) {
-            if (this.#nodes.size) {
-                str += Array.from(this.#nodes.values())
+            if (this.#nodes.length) {
+                str += this.#nodes
                     .map((n) => {
                         switch (n.nodeType) {
                             case 3:
@@ -237,36 +244,22 @@ class Element extends Node implements ElementLike {
             | DocumentFragmentLike
             | NodeLike
     ) {
-        if (
-            !(
-                node instanceof Node ||
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                node instanceof Element ||
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                node instanceof DocumentFragment
-            )
-        ) {
-            return
-        }
-
         if (node.nodeType === 11) {
             ;(node as Element).childNodes.forEach((n) => {
                 if ((n as ElementLike).nodeType === 1) {
-                    this.#children.add(n as ElementLike)
+                    this.#children.push(n as ElementLike)
                 }
 
-                this.#nodes.add(n)
+                this.#nodes.push(n)
             })
             return
         }
 
         if (node.nodeType === 1) {
-            this.#children.add(node as Element)
+            this.#children.push(node as Element)
         }
 
-        this.#nodes.add(node as NodeLike)
+        this.#nodes.push(node as NodeLike)
     }
 }
 

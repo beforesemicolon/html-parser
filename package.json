@@ -1,20 +1,20 @@
 {
   "name": "@beforesemicolon/html-parser",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "HTML parser for any Javascript runtime environment",
   "type": "module",
   "types": "./dist/types/index.d.ts",
   "exports": {
+    "types": "./dist/types/index.d.ts",
     "import": "./dist/esm/index.js",
     "require": "./dist/cjs/index.js",
-    "default": "./dist/esm/index.js",
-    "types": "./dist/types/index.d.ts"
+    "default": "./dist/esm/index.js"
   },
   "scripts": {
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "build:browser": "node node_modules/@beforesemicolon/builder/dist/esm/build-browser.js",
-    "build:modules": "node node_modules/@beforesemicolon/builder/dist/esm/build-modules.js",
+    "build:browser": "node build.js browser",
+    "build:modules": "node build.js modules",
     "build": "rm -rf dist && npm-run-all lint test && tsc --emitDeclarationOnly && npm-run-all build:modules build:browser",
     "lint": "eslint ./src && prettier --check ./src",
     "format": "eslint ./src --fix && prettier --write ./src"

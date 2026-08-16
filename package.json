@@ -16,7 +16,7 @@
     "build:browser": "node build.js browser",
     "build:modules": "node build.js modules",
     "build": "rm -rf dist && npm-run-all lint test && tsc --emitDeclarationOnly && npm-run-all build:modules build:browser",
-    "lint": "eslint ./src && prettier --write src/Doc.ts && git diff -- src/Doc.ts && exit 1",
+    "lint": "eslint ./src && prettier --check ./src",
     "format": "eslint ./src --fix && prettier --write ./src"
   },
   "keywords": [

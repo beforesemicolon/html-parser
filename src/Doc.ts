@@ -36,11 +36,10 @@ export interface ElementLike extends NodeLike {
     appendChild: (node: NodeLike | ElementLike | DocumentFragmentLike) => void
 }
 
-export interface DocumentFragmentLike
-    extends Omit<
-        ElementLike,
-        'outerHTML' | 'setAttribute' | 'attributes' | 'namespaceURI'
-    > {}
+export interface DocumentFragmentLike extends Omit<
+    ElementLike,
+    'outerHTML' | 'setAttribute' | 'attributes' | 'namespaceURI'
+> {}
 
 export interface DocumentLike {
     createTextNode: (value: string) => TextLike

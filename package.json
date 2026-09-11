@@ -33,7 +33,7 @@
     "type": "git"
   },
   "devDependencies": {
-    "@beforesemicolon/builder": "^1.1.1",
+    "@beforesemicolon/builder": "^2.0.0",
     "@types/jest": "^29.5.1",
     "@types/jsdom": "^21.1.1",
     "@types/node": "^20.1.0",

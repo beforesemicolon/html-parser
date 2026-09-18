@@ -6,43 +6,7 @@ on:
     pull_request:
         branches: ['master']
 
-permissions:
-    contents: write
-
 jobs:
-    security-lockfile:
-        if: github.event_name == 'pull_request' && github.head_ref == 'security/minimatch-typescript-eslint-8'
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  ref: ${{ github.head_ref }}
-            - name: Use Node.js 20.x
-              uses: actions/setup-node@v7
-              with:
-                  node-version: 20.x
-                  cache: 'npm'
-            - name: Regenerate and verify lockfile
-              run: |
-                  npm install --package-lock-only --ignore-scripts
-                  npm update minimatch --package-lock-only --ignore-scripts
-                  npm ci
-                  npm run lint
-                  npm test -- --runInBand
-                  npm ls minimatch --all || true
-            - name: Commit regenerated lockfile
-              run: |
-                  if git diff --quiet -- package-lock.json; then
-                      echo 'package-lock.json already current'
-                      exit 0
-                  fi
-                  git config user.name 'github-actions[bot]'
-                  git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-                  git add package-lock.json
-                  git commit -m 'chore(deps): update minimatch security dependencies'
-                  git pull --rebase origin "${{ github.head_ref }}"
-                  git push origin HEAD:${{ github.head_ref }}
-
     build:
         runs-on: ubuntu-latest
 

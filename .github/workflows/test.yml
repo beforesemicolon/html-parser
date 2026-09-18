@@ -25,6 +25,7 @@ jobs:
             - name: Regenerate and verify lockfile
               run: |
                   npm install --package-lock-only --ignore-scripts
+                  npm update minimatch --package-lock-only --ignore-scripts
                   npm ci
                   npm run lint
                   npm test -- --runInBand
@@ -38,7 +39,8 @@ jobs:
                   git config user.name 'github-actions[bot]'
                   git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
                   git add package-lock.json
-                  git commit -m 'chore(deps): regenerate lockfile for minimatch security fix'
+                  git commit -m 'chore(deps): update minimatch security dependencies'
+                  git pull --rebase origin "${{ github.head_ref }}"
                   git push origin HEAD:${{ github.head_ref }}
 
     build:

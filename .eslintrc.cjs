@@ -9,5 +9,6 @@ module.exports = {
     root: true,
     rules: {
         'no-prototype-builtins': ['off'],
+        '@typescript-eslint/no-empty-object-type': ['off'],
     },
 }

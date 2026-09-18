@@ -1,0 +1,41 @@
+name: Generate minimatch security migration lockfile
+
+on:
+  push:
+    branches:
+      - security/minimatch-typescript-eslint-8
+
+permissions:
+  contents: write
+
+jobs:
+  update-lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: security/minimatch-typescript-eslint-8
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20.x
+          cache: npm
+      - name: Regenerate lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Install and verify
+        run: |
+          npm ci
+          npm run lint
+          npm test -- --runInBand
+          npm ls minimatch --all || true
+      - name: Commit lockfile
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo 'package-lock.json already current'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'chore(deps): regenerate lockfile for minimatch security fix'
+          git push origin HEAD:security/minimatch-typescript-eslint-8

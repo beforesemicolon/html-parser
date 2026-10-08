@@ -27,6 +27,17 @@
         "major"
       ],
       "automerge": false
+    },
+    {
+      "matchPackageNames": [
+        "eslint",
+        "eslint-plugin-n"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false,
+      "description": "Hold incompatible lint majors until peer dependency stack is migrated"
     }
   ]
 }
